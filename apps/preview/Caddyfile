@@ -1,0 +1,12 @@
+# خادم الملفات داخل الحاوية فقط (HTTP داخلي). شهادة HTTPS يصدرها الـ proxy الأمامي.
+:80 {
+	root * /srv
+	encode gzip
+	header {
+		X-Robots-Tag "noindex, nofollow"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+	header /assets/* Cache-Control "public, max-age=604800"
+	file_server
+}
