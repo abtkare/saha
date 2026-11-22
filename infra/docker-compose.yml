@@ -1,5 +1,7 @@
 # ساحة — نسخة المعاينة
-# تعمل خلف Nginx الموجود على السيرفر (يملك 80 و443)، فالمنفذ مربوط بـ 127.0.0.1 فقط.
+# مؤقتاً: المنفذ 8097 مكشوف مباشرة (http://72.61.18.234:8097) لأن وكيل هوستنجر
+# لا يملك صلاحية الكتابة في /etc/nginx ولا تثبيت Certbot.
+# في جلسة النشر (8) نعيده إلى "8097:80" خلف Nginx مع HTTPS (infra/nginx/saha.conf).
 name: saha
 
 services:
@@ -8,7 +10,7 @@ services:
     container_name: saha-preview
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8097:80"
+      - "8097:80"
     networks:
       - saha_net
     mem_limit: 128m
