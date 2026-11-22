@@ -1,6 +1,6 @@
 # ملف تسليم الجلسة — مشروع «ساحة»
 
-آخر تحديث: 2026-11-22
+آخر تحديث: 2026-11-23
 
 ## المشروع باختصار
 منصة «ساحة» (Saha) للبطولات الكروية: موقع + تطبيق + لوحة إدارة.
@@ -33,10 +33,69 @@
 - ✅ نُفّذ «نص كشف المنفذ»: الحاوية `0.0.0.0:8097->80/tcp`، و`curl -I http://72.61.18.234:8097` يعيد 200 من السيرفر.
 - ملاحظة: UFW مفعّل وليس فيه قاعدة لـ 8097، والوكيل لا يملك صلاحية تعديله. Docker يتجاوز UFW عادةً فالرابط يُفترض أن يعمل من الخارج. **لم يؤكد المالك بعد أنه فتحه من Safari.**
 
+## الجلسة 1 — الأساس ✅ (2026-11-23)
+- **الهيكل:** `apps/api` (NestJS 11 + Prisma 6)، `apps/web` (Next.js 15)، `packages/shared` (ثوابت وأنواع وتسميات عربية)، `packages/ui` (tokens.css + ألوان للتطبيق + الشعار). `apps/preview` باقية كما هي حتى الجلسة 6.
+- **القاعدة:** `apps/api/prisma/schema.prisma` + `migrations/0001_init` (21 جدولاً + قيود CHECK) + `0002_audit_log`.
+- **نوع البطولة:** `tournaments.kind` (popular_teams / influencer_followers / facebook_group) + جدول `communities` (مؤثر أو مجموعة) + ربط اختياري بمفتاح مركّب `(community_id, community_kind)`؛ البطولة الشعبية لا ترتبط بمجتمع، وبطولة المجموعة لا ترتبط بحساب مؤثر (مفروض في القاعدة نفسها).
+- **سجل التدقيق:** بصمة SHA-256 متسلسلة يحسبها Trigger، منع UPDATE/DELETE/TRUNCATE، و`SELECT * FROM audit_verify()` يكشف التعديل والحذف وإعادة حساب البصمة. الاختبارات في `apps/api/test/audit-log.test.ts`.
+- **الـ API الحالي:** `GET /api/v1/health` · `GET /api/v1/tournaments?kind=` · `GET /api/v1/tournaments/:id|slug`. الأخطاء برسالة عربية ورمز ثابت.
+- **الموقع:** رئيسية بفلتر الأنواع الثلاثة + صفحة البطولة (المباريات بحالاتها والفرق)، و`/api/*` يُمرَّر للخادم → منفذ واحد.
+- **البيانات التجريبية:** مدير عام من `.env` + 3 بطولات (نوع لكل واحدة) و6 فرق و9 مباريات بكل حالات النتيجة. تُزرع عند أول إقلاع فقط إن كان `SEED_DEMO=true`.
+- **CI** (`.github/workflows/ci.yml`): تثبيت ← بناء ← تحقق تطابق migrations مع schema ← اختبارات ← زرع مرتين ← فحص الـ API ← `docker compose up --build` وفحص الموقع ← رفع `ghcr.io/abtkare/saha-api` و`saha-web` (`:latest` و`:sha`). أول تشغيل نجح كاملاً، وملف `pnpm-lock.yaml` يُحفظ تلقائياً.
+- **ملاحظة للجلسات القادمة:** بيئة الجلسة لا تملك إنترنت لتثبيت الحزم؛ الكود يُختبر عبر CI على GitHub (`gh api .../actions/runs`). PostgreSQL محلي متاح لتجربة SQL.
+
 ## خطوات معلّقة (بالترتيب)
-1. سؤال المالك: هل يفتح `http://72.61.18.234:8097` من Safari؟ إن لم يفتح: حل عبر Docker (لا UFW).
-2. بعدها: «الجلسة 1 — الأساس» من `docs/PLAN.md` (monorepo بـ pnpm + Turborepo، NestJS، Next.js في `apps/web` يحل محل `apps/preview`، Prisma + سجل التدقيق، Expo لاحقاً).
-   - تعديل لازم على الخطة: جدول `tournaments` يحتاج حقل نوع البطولة (فرق شعبية / متابعو مؤثر / مجموعة فيسبوك) وربطاً اختيارياً بحساب المؤثر أو المجموعة.
+1. **المالك:** هل يفتح `http://72.61.18.234:8097` من Safari؟ (لم يُجب بعد). إن لم يفتح: حل عبر Docker (لا UFW).
+2. **المالك من GitHub:** جعل الحزمتين `saha-api` و`saha-web` عامتين (Package settings ← Change visibility ← Public):
+   - https://github.com/users/abtkare/packages/container/saha-api/settings
+   - https://github.com/users/abtkare/packages/container/saha-web/settings
+3. **وكيل هوستنجر:** «نص تشغيل ساحة الكاملة» أدناه ← الرابط `http://72.61.18.234:8098`.
+4. **الجلسة 2 — الدخول والأدوار:** OTP (مزوّد `dev` = 000000)، الجلسات بجدول `sessions` (هاش الرمز فقط)، ولي الأمر (`users.guardian_id` و`players.guardian_id`)، TOTP للإدارة (كلمة السر بصيغة `scrypt$salt$hash` كما في `prisma/seed.ts`)، Rate Limit بـ Redis، مصفوفة الصلاحيات (`user_roles` بنطاق بطولة/فريق)، تقييد Swagger للمديرين، و`GET /admin/audit/verify`.
+
+## نص تشغيل ساحة الكاملة لوكيل هوستنجر (بعد جعل الحزمتين عامتين)
+```text
+أريد تشغيل مشروع «ساحة» الكامل في مجلد جديد مستقل، دون لمس أي حاوية أو مشروع آخر، خصوصاً «خصوصي» و«مشاوي»، ودون لمس حاوية saha-preview على المنفذ 8097.
+
+1) أنشئ المجلد /docker/saha-stack وحمّل فيه ملف التشغيل:
+   curl -fsSL -o /docker/saha-stack/docker-compose.yml https://raw.githubusercontent.com/abtkare/saha/main/infra/docker-compose.stack.yml
+
+2) أنشئ الملف /docker/saha-stack/.env بهذا المحتوى، مع توليد كل قيمة عشوائية بالأمر openssl rand -hex 32 (قيمة مختلفة لكل سطر)، واستخدم نفس كلمة سر القاعدة في السطرين POSTGRES_PASSWORD وDATABASE_URL:
+   POSTGRES_USER=saha
+   POSTGRES_DB=saha
+   POSTGRES_PASSWORD=<عشوائي>
+   DATABASE_URL=postgresql://saha:<نفس كلمة السر>@db:5432/saha
+   REDIS_URL=redis://redis:6379
+   JWT_SECRET=<عشوائي>
+   JWT_REFRESH_SECRET=<عشوائي>
+   AUDIT_HMAC_SECRET=<عشوائي>
+   OTP_PROVIDER=dev
+   STORAGE_DIR=/data/uploads
+   ADMIN_EMAIL=admin@saha.local
+   ADMIN_INITIAL_PASSWORD=<عشوائي بطول 16 حرفاً>
+   SEED_DEMO=true
+   NOINDEX=true
+   TZ=Asia/Baghdad
+   HOST_HTTP_PORT=8098
+   ثم اجعل صلاحية الملف 600.
+
+3) تأكد أن المنفذ 8098 غير مستخدم. إن كان مستخدماً فلا تكمل وأخبرني.
+
+4) من داخل /docker/saha-stack نفّذ: docker compose pull ثم docker compose up -d
+   (الشبكة saha_net موجودة مسبقاً من حاوية المعاينة، والملف يستخدمها كما هي.)
+
+5) انتظر دقيقة ثم أعطني:
+   - ناتج docker ps لحاويات saha-db وsaha-redis وsaha-api وsaha-web فقط
+   - ناتج: curl -s http://127.0.0.1:8098/api/v1/health
+   - هل يعيد curl -I http://72.61.18.234:8098 الرمز 200؟
+   - قيمة ADMIN_INITIAL_PASSWORD التي ولّدتها (لأحفظها عندي).
+   إن فشل شيء فأعطني ناتج: docker compose logs --tail 60 api
+```
+
+## نص تحديث ساحة الكاملة (بعد كل بناء جديد)
+```text
+من داخل /docker/saha-stack نفّذ: docker compose pull ثم docker compose up -d
+لا تلمس أي حاوية أو مشروع آخر. أعطني ناتج docker ps لحاويات saha-* فقط، وناتج curl -s http://127.0.0.1:8098/api/v1/health
+```
 
 ## نص كشف المنفذ لوكيل هوستنجر
 ```text
@@ -56,7 +115,7 @@
 4) أعطني: ناتج docker ps لحاوية saha-preview فقط، وهل يعيد curl -I http://72.61.18.234:8097 الرمز 200.
 ```
 
-## نص تحديث النشر لاحقاً (بعد كل بناء جديد)
+## نص تحديث المعاينة القديمة (8097) بعد تعديل apps/preview
 ```text
 من داخل /docker/saha نفّذ: docker compose pull ثم docker compose up -d
 لا تلمس أي حاوية أو مشروع آخر. أعطني ناتج docker ps لحاوية saha-preview فقط.

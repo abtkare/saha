@@ -75,9 +75,25 @@ Nov 22, 2026 · @جمعية الميثاق الاعظم
 
 ```sql
 -- البطولات
+-- المجتمع المضيف: حساب مؤثر/صانع محتوى أو مجموعة فيسبوك (أُضيف في الجلسة 1)
+CREATE TABLE communities (
+  id              SERIAL PRIMARY KEY,
+  kind            community_kind NOT NULL,          -- influencer | facebook_group
+  name_ar         TEXT NOT NULL,
+  platform_url    TEXT,
+  owner_user_id   INT,
+  followers_count INT,
+  verified_at     TIMESTAMPTZ,
+  UNIQUE (id, kind)
+);
+
 CREATE TABLE tournaments (
   id                 BIGSERIAL PRIMARY KEY,
   name_ar            TEXT NOT NULL,
+  kind               tournament_kind NOT NULL DEFAULT 'popular_teams', -- popular_teams | influencer_followers | facebook_group
+  community_id       INT,                -- اختياري؛ ممنوع لبطولات الفرق الشعبية
+  community_kind     community_kind,     -- مع community_id: مفتاح أجنبي مركّب يضمن تطابق النوع
+  age_category       age_category NOT NULL DEFAULT 'open',
   city               TEXT,
   starts_on          DATE,
   ends_on            DATE,
@@ -485,5 +501,6 @@ https://claude.ai/artifact/4yE5e1UHMKrKCDTAk2YCpD
 
 ## سجل التغييرات
 
+- **2026-11-23 — الجلسة 1 (الأساس) أُنجزت:** monorepo بـ pnpm + Turborepo (`apps/api` NestJS 11، `apps/web` Next.js 15، `packages/shared`، `packages/ui`). مخطط Prisma كامل للمرحلة الأولى في `apps/api/prisma/schema.prisma` مع migration مطابق (CI يتحقق من التطابق). **نوع البطولة** حقل `kind` وجدول `communities` وقيد مركّب `(community_id, community_kind)` + CHECK يمنع ربط بطولة شعبية بمجتمع أو ربط بطولة مجموعة بحساب مؤثر. سجل التدقيق في `apps/api/prisma/migrations/0002_audit_log` (بدل `infra/sql`) مع `audit_verify()`. المعرّفات `INT` بدل `BIGINT` إلا `audit_log` و`slide_events`. `docker-compose.yml` في الجذر يشغّل كل شيء بأمر واحد، و`infra/docker-compose.stack.yml` للسيرفر. الموقع يمرّر `/api/*` إلى الخادم فيبقى منفذ واحد مكشوف. الإصدار يُرفع على GitHub مباشرة (لا zip).
 - **2026-11-22:** توسيع نطاق المنصة إلى ثلاثة أنواع بطولات: الفرق الشعبية، متابعو المؤثرين وصنّاع المحتوى، أعضاء مجموعات فيسبوك. الشعار النصي الجديد: «كل جمهور يستحق بطولته». الكرة في شاشة البداية كرة قدم حقيقية.
 - **2026-11-22:** نتيجة فحص السيرفر: Nginx على النظام يملك 80 و443، والمنافذ 8010 و8085 و8088 و8095 و8096 مستخدمة. القرار: «ساحة» تعمل على `127.0.0.1:8097` خلف Nginx الموجود بملف موقع مستقل (`infra/nginx/saha.conf`)، والرابط المؤقت `https://saha.72-61-18-234.sslip.io`. لا يُشغَّل Caddy أمامي.
