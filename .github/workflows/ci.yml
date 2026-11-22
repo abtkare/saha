@@ -1,0 +1,138 @@
+name: الفحص والبناء
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["apps/preview/**", "docs/**", "**/*.md"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: الاختبارات وقاعدة البيانات
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: saha
+          POSTGRES_PASSWORD: saha
+          POSTGRES_DB: saha
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U saha" --health-interval 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://saha:saha@localhost:5432/saha
+      SHADOW_DATABASE_URL: postgresql://saha:saha@localhost:5432/saha_shadow
+      ADMIN_EMAIL: admin@saha.local
+      ADMIN_INITIAL_PASSWORD: ci_only_password
+      SEED_DEMO: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - name: تثبيت الحزم
+        run: pnpm install --no-frozen-lockfile
+
+      - name: البناء (shared, ui, api, web)
+        run: pnpm build
+
+      - name: تطابق الـ migrations مع schema.prisma
+        working-directory: apps/api
+        run: |
+          psql "postgresql://saha:saha@localhost:5432/saha" -c "CREATE DATABASE saha_shadow"
+          npx prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url "$SHADOW_DATABASE_URL" --script > /tmp/drift.sql
+          if [ -s /tmp/drift.sql ] && grep -qvE '^(-- This is an empty migration\.|\s*)$' /tmp/drift.sql; then
+            echo "::error title=اختلاف بين schema.prisma والـ migrations::$(sed ':a;N;$!ba;s/\n/%0A/g' /tmp/drift.sql)"
+            cat /tmp/drift.sql; exit 1
+          fi
+
+      - name: تطبيق الـ migrations
+        working-directory: apps/api
+        run: npx prisma migrate deploy
+
+      - name: اختبار سجل التدقيق ونوع البطولة
+        working-directory: apps/api
+        run: pnpm test
+
+      - name: زرع البيانات التجريبية (مرتين للتأكد أنه لا يكرر)
+        working-directory: apps/api
+        run: node dist/prisma/seed.js && node dist/prisma/seed.js
+
+      - name: فحص الأنواع للاختبارات
+        working-directory: apps/api
+        run: npx tsc -p tsconfig.json --noEmit
+
+      - name: تشغيل الخادم وفحص الـ API
+        working-directory: apps/api
+        run: |
+          node dist/src/main.js > /tmp/api.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf localhost:3001/api/v1/health && break; sleep 1; done
+          curl -sf localhost:3001/api/v1/tournaments | node -e "
+            const t = JSON.parse(require('fs').readFileSync(0));
+            const kinds = new Set(t.map(x => x.kind));
+            console.log('بطولات:', t.length, [...kinds]);
+            if (t.length !== 3 || kinds.size !== 3) process.exit(1);"
+          curl -sf "localhost:3001/api/v1/tournaments?kind=facebook_group" | grep -q hilla-group-cup
+          psql "$DATABASE_URL" -tAc "SELECT ok FROM audit_verify()" | grep -q t
+          code=$(curl -s -o /dev/null -w '%{http_code}' "localhost:3001/api/v1/tournaments?kind=xx"); test "$code" = 400
+
+      - name: إظهار الأخطاء
+        if: failure()
+        run: |
+          [ -f /tmp/api.log ] && tail -50 /tmp/api.log || true
+
+      - name: حفظ ملف القفل pnpm-lock.yaml
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          if [ -n "$(git status --porcelain pnpm-lock.yaml)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add pnpm-lock.yaml
+            git commit -m "تحديث pnpm-lock.yaml تلقائياً [skip ci]"
+            git pull --rebase origin main && git push
+          fi
+
+  stack:
+    name: التشغيل بأمر واحد ورفع الصور
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: docker compose up --build
+        run: docker compose up -d --build --wait --wait-timeout 240
+
+      - name: فحص الموقع والـ API عبر منفذ واحد
+        run: |
+          curl -sf localhost:8098/api/v1/health
+          html=$(curl -sf localhost:8098/)
+          echo "$html" | grep -q "كل جمهور يستحق بطولته"
+          echo "$html" | grep -q "بطولة ساحات بغداد الشعبية"
+          curl -sf localhost:8098/tournaments/baghdad-sahat-2026 | grep -q "شباب الكرادة"
+
+      - name: السجلات عند الفشل
+        if: failure()
+        run: docker compose logs --tail 80
+
+      - name: رفع الصور إلى GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          for app in api web; do
+            docker tag ghcr.io/abtkare/saha-$app:dev ghcr.io/abtkare/saha-$app:latest
+            docker tag ghcr.io/abtkare/saha-$app:dev ghcr.io/abtkare/saha-$app:${{ github.sha }}
+            docker push ghcr.io/abtkare/saha-$app:latest
+            docker push ghcr.io/abtkare/saha-$app:${{ github.sha }}
+          done

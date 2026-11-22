@@ -1,0 +1,624 @@
+// مخطط قاعدة بيانات «ساحة» — المرحلة الأولى (بدون بث).
+// المصدر: docs/PLAN.md. أي تعديل هنا يحتاج ملف migration جديداً في prisma/migrations.
+// قيود CHECK والـ Triggers (سجل التدقيق) مكتوبة بـ SQL في ملفات الـ migration لأن Prisma لا يمثّلها.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────── القيم الثابتة ─────────────
+
+enum UserStatus {
+  active
+  pending_guardian // قاصر ينتظر موافقة ولي أمره
+  suspended
+  deleted
+
+  @@map("user_status")
+}
+
+enum RoleName {
+  super_admin
+  content_editor
+  sponsor_manager
+  tournament_manager
+  referee
+  team_manager
+  discipline_committee
+  sponsor_viewer
+
+  @@map("role_name")
+}
+
+/// نوع البطولة: الفرق الشعبية، متابعو مؤثر، أعضاء مجموعة فيسبوك
+enum TournamentKind {
+  popular_teams
+  influencer_followers
+  facebook_group
+
+  @@map("tournament_kind")
+}
+
+/// نوع المجتمع المضيف للبطولة
+enum CommunityKind {
+  influencer
+  facebook_group
+
+  @@map("community_kind")
+}
+
+enum TournamentFormat {
+  league
+  knockout
+  groups_knockout
+
+  @@map("tournament_format")
+}
+
+enum TournamentStatus {
+  draft
+  registration
+  running
+  finished
+  cancelled
+
+  @@map("tournament_status")
+}
+
+enum AgeCategory {
+  open
+  u18
+  u14
+
+  @@map("age_category")
+}
+
+enum VerifyMethod {
+  oauth
+  manual
+
+  @@map("verify_method")
+}
+
+enum RequestStatus {
+  pending
+  approved
+  rejected
+  withdrawn
+
+  @@map("request_status")
+}
+
+enum ResultStatus {
+  scheduled
+  provisional
+  confirmed
+  disputed
+  final
+
+  @@map("result_status")
+}
+
+enum MatchEventType {
+  goal
+  own_goal
+  yellow_card
+  red_card
+  mvp
+
+  @@map("match_event_type")
+}
+
+enum DisputeStatus {
+  open
+  upheld
+  rejected
+
+  @@map("dispute_status")
+}
+
+enum ContentStatus {
+  draft
+  review
+  published
+  archived
+
+  @@map("content_status")
+}
+
+enum SlideType {
+  sponsor
+  news
+  match // «مباراة اليوم» — تتحول لاحقاً إلى مباشرة بإضافة رابط بث
+  tournament
+  promo
+
+  @@map("slide_type")
+}
+
+enum SlideEventType {
+  impression
+  click
+
+  @@map("slide_event_type")
+}
+
+enum PostType {
+  news
+  page
+
+  @@map("post_type")
+}
+
+// ───────────── الحسابات ─────────────
+
+model User {
+  id           Int        @id @default(autoincrement())
+  phone        String?    @unique
+  email        String?    @unique
+  fullName     String     @map("full_name")
+  birthYear    Int?       @map("birth_year")
+  passwordHash String?    @map("password_hash")
+  totpSecret   String?    @map("totp_secret")
+  totpEnabled  Boolean    @default(false) @map("totp_enabled")
+  status       UserStatus @default(active)
+  guardianId   Int?       @map("guardian_id")
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  guardian            User?                     @relation("Guardianship", fields: [guardianId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  wards               User[]                    @relation("Guardianship")
+  roles               UserRole[]
+  sessions            Session[]
+  ownedCommunities    Community[]
+  managedTeams        Team[]
+  playerProfile       Player?                   @relation("PlayerAccount")
+  guardedPlayers      Player[]                  @relation("PlayerGuardian")
+  createdTournaments  Tournament[]
+  refereedMatches     Match[]
+  raisedDisputes      Dispute[]
+  disputeVotes        DisputeVote[]
+  matchEvents         MatchEvent[]
+  verificationReviews TeamVerificationRequest[]
+  feeRecords          TournamentRegistration[]
+  createdSlides       HeroSlide[]               @relation("SlideCreator")
+  approvedSlides      HeroSlide[]               @relation("SlideApprover")
+  posts               Post[]
+  mediaAssets         MediaAsset[]
+  notifications       Notification[]
+
+  @@index([guardianId])
+  @@map("users")
+}
+
+/// دور المستخدم، مع نطاق اختياري (بطولة أو فريق)
+model UserRole {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  role         RoleName
+  tournamentId Int?     @map("tournament_id")
+  teamId       Int?     @map("team_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tournament Tournament? @relation(fields: [tournamentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team       Team?       @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId])
+  @@map("user_roles")
+}
+
+/// جلسات الدخول (refresh tokens) — يُخزَّن هاش الرمز فقط
+model Session {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  userAgent String?   @map("user_agent")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ───────────── المجتمعات (مؤثرون ومجموعات فيسبوك) ─────────────
+
+/// حساب مؤثر/صانع محتوى أو مجموعة فيسبوك تستضيف بطولة لجمهورها
+model Community {
+  id             Int           @id @default(autoincrement())
+  kind           CommunityKind
+  nameAr         String        @map("name_ar")
+  platformUrl    String?       @map("platform_url")
+  externalId     String?       @map("external_id")
+  ownerUserId    Int?          @map("owner_user_id")
+  followersCount Int?          @map("followers_count")
+  verifiedAt     DateTime?     @map("verified_at") @db.Timestamptz(3)
+  verifyMethod   VerifyMethod? @map("verify_method")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  owner       User?        @relation(fields: [ownerUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tournaments Tournament[]
+  teams       Team[]
+
+  @@unique([id, kind])
+  @@index([ownerUserId])
+  @@map("communities")
+}
+
+// ───────────── البطولات ─────────────
+
+model Tournament {
+  id               Int              @id @default(autoincrement())
+  nameAr           String           @map("name_ar")
+  slug             String           @unique
+  /// نوع البطولة
+  kind             TournamentKind   @default(popular_teams)
+  /// المجتمع المضيف (مؤثر أو مجموعة) — اختياري، ولا يُسمح به لبطولات الفرق الشعبية
+  communityId      Int?             @map("community_id")
+  /// نسخة من نوع المجتمع لضمان التطابق بقيد مركّب (يملؤها الخادم)
+  communityKind    CommunityKind?   @map("community_kind")
+  city             String?
+  startsOn         DateTime?        @map("starts_on") @db.Date
+  endsOn           DateTime?        @map("ends_on") @db.Date
+  format           TournamentFormat
+  ageCategory      AgeCategory      @default(open) @map("age_category")
+  disputeWindowHrs Int              @default(24) @map("dispute_window_hrs")
+  entryFeeIqd      Int              @default(0) @map("entry_fee_iqd")
+  maxTeams         Int?             @map("max_teams")
+  status           TournamentStatus @default(draft)
+  createdById      Int?             @map("created_by_id")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  community     Community?               @relation(fields: [communityId, communityKind], references: [id, kind], onDelete: Restrict, onUpdate: Cascade)
+  createdBy     User?                    @relation(fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  registrations TournamentRegistration[]
+  matches       Match[]
+  roles         UserRole[]
+  heroSlides    HeroSlide[]
+
+  @@index([kind, status])
+  @@index([communityId, communityKind])
+  @@map("tournaments")
+}
+
+model Team {
+  id           Int           @id @default(autoincrement())
+  nameAr       String        @map("name_ar")
+  logoUrl      String?       @map("logo_url")
+  city         String?
+  managerId    Int           @map("manager_id")
+  communityId  Int?          @map("community_id")
+  fbPageUrl    String?       @map("fb_page_url")
+  fbPageId     String?       @map("fb_page_id")
+  verifiedAt   DateTime?     @map("verified_at") @db.Timestamptz(3)
+  verifyMethod VerifyMethod? @map("verify_method")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  manager              User                      @relation(fields: [managerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  community            Community?                @relation(fields: [communityId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  players              TeamPlayer[]
+  registrations        TournamentRegistration[]
+  homeMatches          Match[]                   @relation("HomeTeam")
+  awayMatches          Match[]                   @relation("AwayTeam")
+  verificationRequests TeamVerificationRequest[]
+  matchEvents          MatchEvent[]
+  disputes             Dispute[]
+  roles                UserRole[]
+
+  @@index([managerId])
+  @@index([communityId])
+  @@map("teams")
+}
+
+/// طلب توثيق صفحة الفريق: يدوي (رمز في منشور) أو OAuth لاحقاً
+model TeamVerificationRequest {
+  id           Int           @id @default(autoincrement())
+  teamId       Int           @map("team_id")
+  method       VerifyMethod
+  code         String
+  postUrl      String?       @map("post_url")
+  status       RequestStatus @default(pending)
+  reviewedById Int?          @map("reviewed_by_id")
+  reviewedAt   DateTime?     @map("reviewed_at") @db.Timestamptz(3)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  team       Team  @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  reviewedBy User? @relation(fields: [reviewedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([teamId])
+  @@map("team_verification_requests")
+}
+
+/// اللاعب: بالغ له حساب، أو قاصر يديره ولي أمره. جدول واحد يخدم البطولات والمدرسة لاحقاً.
+model Player {
+  id           Int       @id @default(autoincrement())
+  userId       Int?      @unique @map("user_id")
+  guardianId   Int?      @map("guardian_id")
+  firstName    String    @map("first_name")
+  lastName     String?   @map("last_name")
+  birthYear    Int       @map("birth_year")
+  /// موافقة الصور — نصها يذكر البث مستقبلاً
+  mediaConsent Boolean   @default(false) @map("media_consent")
+  consentAt    DateTime? @map("consent_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user     User?        @relation("PlayerAccount", fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  guardian User?        @relation("PlayerGuardian", fields: [guardianId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  teams    TeamPlayer[]
+  events   MatchEvent[]
+
+  @@index([guardianId])
+  @@map("players")
+}
+
+model TeamPlayer {
+  teamId   Int      @map("team_id")
+  playerId Int      @map("player_id")
+  shirtNo  Int?     @map("shirt_no")
+  joinedAt DateTime @default(now()) @map("joined_at") @db.Timestamptz(3)
+
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@id([teamId, playerId])
+  @@map("team_players")
+}
+
+/// تسجيل فريق في بطولة، والرسوم تُسجّل يدوياً من الإدارة (لا دفع إلكتروني في المرحلة الأولى)
+model TournamentRegistration {
+  id            Int           @id @default(autoincrement())
+  tournamentId  Int           @map("tournament_id")
+  teamId        Int           @map("team_id")
+  status        RequestStatus @default(pending)
+  groupLabel    String?       @map("group_label")
+  feePaidIqd    Int?          @map("fee_paid_iqd")
+  feeRecordedBy Int?          @map("fee_recorded_by")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  recordedBy User?      @relation(fields: [feeRecordedBy], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([tournamentId, teamId])
+  @@map("tournament_registrations")
+}
+
+// ───────────── المباريات والنتائج ─────────────
+
+model Match {
+  id             Int          @id @default(autoincrement())
+  tournamentId   Int          @map("tournament_id")
+  stage          String?
+  round          Int?
+  homeTeamId     Int          @map("home_team_id")
+  awayTeamId     Int          @map("away_team_id")
+  kickoffAt      DateTime?    @map("kickoff_at") @db.Timestamptz(3)
+  venue          String?
+  refereeId      Int?         @map("referee_id")
+  homeScore      Int?         @map("home_score")
+  awayScore      Int?         @map("away_score")
+  resultStatus   ResultStatus @default(scheduled) @map("result_status")
+  /// نتيجة نصية مباشرة يحدّثها الحكم (شريحة «مباراة اليوم»)
+  liveText       String?      @map("live_text")
+  sheetPhotoUrl  String?      @map("sheet_photo_url")
+  homeConfirmed  Boolean      @default(false) @map("home_confirmed")
+  awayConfirmed  Boolean      @default(false) @map("away_confirmed")
+  resultEnteredAt DateTime?   @map("result_entered_at") @db.Timestamptz(3)
+  finalizedAt    DateTime?    @map("finalized_at") @db.Timestamptz(3)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tournament Tournament   @relation(fields: [tournamentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  homeTeam   Team         @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  awayTeam   Team         @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  referee    User?        @relation(fields: [refereeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  events     MatchEvent[]
+  disputes   Dispute[]
+  heroSlides HeroSlide[]
+
+  @@index([tournamentId])
+  @@index([kickoffAt])
+  @@index([refereeId])
+  @@map("matches")
+}
+
+/// أحداث المباراة (أهداف، بطاقات، أفضل لاعب) — مصدر ترشيحات المدرسة لاحقاً
+model MatchEvent {
+  id          Int            @id @default(autoincrement())
+  matchId     Int            @map("match_id")
+  teamId      Int            @map("team_id")
+  playerId    Int?           @map("player_id")
+  type        MatchEventType
+  minute      Int?
+  createdById Int?           @map("created_by_id")
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  match     Match   @relation(fields: [matchId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team      Team    @relation(fields: [teamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  player    Player? @relation(fields: [playerId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdBy User?   @relation(fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([matchId])
+  @@index([playerId])
+  @@map("match_events")
+}
+
+model Dispute {
+  id           Int           @id @default(autoincrement())
+  matchId      Int           @map("match_id")
+  raisedById   Int           @map("raised_by_id")
+  teamId       Int?          @map("team_id")
+  reason       String
+  status       DisputeStatus @default(open)
+  decisionNote String?       @map("decision_note")
+  decidedAt    DateTime?     @map("decided_at") @db.Timestamptz(3)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  match    Match         @relation(fields: [matchId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  raisedBy User          @relation(fields: [raisedById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  team     Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  votes    DisputeVote[]
+
+  @@index([matchId])
+  @@map("disputes")
+}
+
+/// صوت عضو لجنة الانضباط (3 أعضاء)
+model DisputeVote {
+  disputeId Int      @map("dispute_id")
+  memberId  Int      @map("member_id")
+  uphold    Boolean
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  dispute Dispute @relation(fields: [disputeId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  member  User    @relation(fields: [memberId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@id([disputeId, memberId])
+  @@map("dispute_votes")
+}
+
+// ───────────── الرعاة والهيرو سلايدر ─────────────
+
+model Sponsor {
+  id           Int      @id @default(autoincrement())
+  nameAr       String   @map("name_ar")
+  logoUrl      String?  @map("logo_url")
+  website      String?
+  contactName  String?  @map("contact_name")
+  contactPhone String?  @map("contact_phone")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  slides HeroSlide[]
+
+  @@map("sponsors")
+}
+
+model HeroSlide {
+  id           Int           @id @default(autoincrement())
+  type         SlideType
+  titleAr      String        @map("title_ar")
+  subtitleAr   String?       @map("subtitle_ar")
+  imageUrl     String?       @map("image_url")
+  linkUrl      String?       @map("link_url")
+  sponsorId    Int?          @map("sponsor_id")
+  tournamentId Int?          @map("tournament_id")
+  matchId      Int?          @map("match_id")
+  status       ContentStatus @default(draft)
+  priority     Int           @default(0)
+  startsAt     DateTime?     @map("starts_at") @db.Timestamptz(3)
+  endsAt       DateTime?     @map("ends_at") @db.Timestamptz(3)
+  approvedById Int?          @map("approved_by_id")
+  approvedAt   DateTime?     @map("approved_at") @db.Timestamptz(3)
+  createdById  Int?          @map("created_by_id")
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sponsor    Sponsor?     @relation(fields: [sponsorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tournament Tournament?  @relation(fields: [tournamentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  match      Match?       @relation(fields: [matchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  approvedBy User?        @relation("SlideApprover", fields: [approvedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  createdBy  User?        @relation("SlideCreator", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  events     SlideEvent[]
+
+  @@index([status, priority])
+  @@map("hero_slides")
+}
+
+/// ظهور ونقرات الشرائح — صف واحد لكل جهاز ونوع حدث في اليوم
+model SlideEvent {
+  id        BigInt         @id @default(autoincrement())
+  slideId   Int            @map("slide_id")
+  type      SlideEventType
+  deviceId  String         @map("device_id")
+  day       DateTime       @db.Date
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  slide HeroSlide @relation(fields: [slideId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([slideId, type, deviceId, day])
+  @@index([slideId, createdAt])
+  @@map("slide_events")
+}
+
+// ───────────── المحتوى ─────────────
+
+model Post {
+  id          Int           @id @default(autoincrement())
+  type        PostType      @default(news)
+  slug        String        @unique
+  titleAr     String        @map("title_ar")
+  bodyAr      String        @map("body_ar")
+  coverUrl    String?       @map("cover_url")
+  status      ContentStatus @default(draft)
+  publishedAt DateTime?     @map("published_at") @db.Timestamptz(3)
+  authorId    Int?          @map("author_id")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([type, status, publishedAt])
+  @@map("posts")
+}
+
+model MediaAsset {
+  id           Int      @id @default(autoincrement())
+  path         String
+  mime         String
+  sizeBytes    Int      @map("size_bytes")
+  width        Int?
+  height       Int?
+  uploadedById Int?     @map("uploaded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@map("media_assets")
+}
+
+/// إشعار لمستخدم محدد، أو عام إن كان userId فارغاً
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int?      @map("user_id")
+  titleAr   String    @map("title_ar")
+  bodyAr    String    @map("body_ar")
+  data      Json?
+  readAt    DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+// ───────────── سجل التدقيق ─────────────
+
+/// سجل تدقيق بتسلسل تجزئة. لا يُعدَّل ولا يُحذف (Triggers في migration 0002).
+/// seq وprevHash وhash وoccurredAt يملؤها الـ Trigger عند الإدراج — لا تمررها من الكود.
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  seq         BigInt   @unique @default(0)
+  occurredAt  DateTime @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  actorUserId Int?     @map("actor_user_id")
+  action      String
+  entity      String
+  entityId    String?  @map("entity_id")
+  payload     Json     @default("{}")
+  ip          String?
+  prevHash    String?  @map("prev_hash")
+  hash        String   @default("")
+
+  @@index([entity, entityId])
+  @@map("audit_log")
+}

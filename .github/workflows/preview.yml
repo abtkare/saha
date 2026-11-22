@@ -3,6 +3,7 @@ name: بناء نسخة المعاينة
 on:
   push:
     branches: [main]
+    paths: ["apps/preview/**", ".github/workflows/preview.yml"]
   workflow_dispatch:
 
 permissions:

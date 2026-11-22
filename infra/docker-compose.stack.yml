@@ -1,0 +1,64 @@
+# «ساحة» الكاملة على السيرفر (قاعدة + Redis + خادم + موقع) من صور جاهزة على GHCR.
+# المجلد على السيرفر: /docker/saha-stack  — ملف .env بجانبه (انظر .env.example).
+# المنفذ المكشوف الوحيد: HOST_HTTP_PORT (افتراضياً 8098). المعاينة القديمة تبقى على 8097.
+name: saha-stack
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: saha-db
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TZ: Asia/Baghdad
+    volumes: [saha_db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 30
+    networks: [saha_net]
+    mem_limit: 384m
+
+  redis:
+    image: redis:7-alpine
+    container_name: saha-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "64mb"]
+    volumes: [saha_redis:/data]
+    networks: [saha_net]
+    mem_limit: 96m
+
+  api:
+    image: ghcr.io/abtkare/saha-api:latest
+    container_name: saha-api
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    volumes: [saha_uploads:/data/uploads]
+    networks: [saha_net]
+    mem_limit: 384m
+
+  web:
+    image: ghcr.io/abtkare/saha-web:latest
+    container_name: saha-web
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:3001
+      NOINDEX: "true"
+    depends_on: [api]
+    ports:
+      - "${HOST_HTTP_PORT:-8098}:3000"
+    networks: [saha_net]
+    mem_limit: 256m
+
+volumes:
+  saha_db: { name: saha_db }
+  saha_redis: { name: saha_redis }
+  saha_uploads: { name: saha_uploads }
+
+networks:
+  saha_net:
+    name: saha_net
+    external: true

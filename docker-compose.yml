@@ -1,0 +1,65 @@
+# «ساحة» كاملة بأمر واحد (للتطوير والاختبار): docker compose up --build
+# تبني الصور من الكود. للسيرفر استخدم infra/docker-compose.stack.yml (صور جاهزة من GHCR).
+name: saha
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: saha-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-saha}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-saha_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-saha}
+      TZ: Asia/Baghdad
+    volumes: [saha_db:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 20
+    networks: [saha_net]
+
+  redis:
+    image: redis:7-alpine
+    container_name: saha-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [saha_redis:/data]
+    networks: [saha_net]
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    image: ghcr.io/abtkare/saha-api:dev
+    container_name: saha-api
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_started }
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-saha}:${POSTGRES_PASSWORD:-saha_dev_only}@db:5432/${POSTGRES_DB:-saha}
+      REDIS_URL: redis://redis:6379
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@saha.local}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-change_me_dev}
+      SEED_DEMO: ${SEED_DEMO:-true}
+      OTP_PROVIDER: dev
+      SWAGGER_ENABLED: "true"
+    volumes: [saha_uploads:/data/uploads]
+    networks: [saha_net]
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    image: ghcr.io/abtkare/saha-web:dev
+    container_name: saha-web
+    depends_on: [api]
+    environment:
+      API_INTERNAL_URL: http://api:3001
+      NOINDEX: "true"
+    ports:
+      - "${HOST_HTTP_PORT:-8098}:3000"
+    networks: [saha_net]
+
+volumes:
+  saha_db: { name: saha_db }
+  saha_redis: { name: saha_redis }
+  saha_uploads: { name: saha_uploads }
+
+networks:
+  saha_net:
+    name: saha_net

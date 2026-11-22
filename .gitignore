@@ -7,3 +7,6 @@ dist/
 .turbo/
 *.log
 .DS_Store
+coverage/
+next-env.d.ts
+*.tsbuildinfo

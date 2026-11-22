@@ -1,0 +1,40 @@
+/* هوية «ساحة» — المصدر الوحيد للألوان والخطوط. لا تكتب ألواناً مباشرة في المكونات. */
+:root {
+  --color-primary: #0B6E4F;
+  --color-accent: #F2B705;
+  --color-ink: #0E1A24;
+  --color-bg: #F6F3EC;
+  --color-surface: #FFFFFF;
+  --color-muted: #6B7780;
+  --color-border: #E3DED2;
+  --color-danger: #D7263D;
+  --color-info: #2D7FF9;
+  --font-display: 'Cairo', sans-serif;
+  --font-body: 'IBM Plex Sans Arabic', sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-6: 24px; --space-8: 32px; --space-12: 48px;
+}
+[data-theme='dark'] {
+  --color-primary: #2FA37A;
+  --color-ink: #F6F3EC;
+  --color-bg: #0E1A24;
+  --color-surface: #16252F;
+  --color-muted: #9AA6AE;
+  --color-border: #24343F;
+  --color-danger: #FF5A6E;
+  --color-info: #5C9DFF;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-primary: #2FA37A;
+    --color-ink: #F6F3EC;
+    --color-bg: #0E1A24;
+    --color-surface: #16252F;
+    --color-muted: #9AA6AE;
+    --color-border: #24343F;
+    --color-danger: #FF5A6E;
+    --color-info: #5C9DFF;
+  }
+}

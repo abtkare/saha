@@ -1,0 +1,35 @@
+{
+  "name": "@saha/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "typecheck": "prisma generate && tsc -p tsconfig.json --noEmit",
+    "start": "node dist/src/main.js",
+    "start:prod": "prisma migrate deploy && node dist/prisma/seed.js && node dist/src/main.js",
+    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "node dist/prisma/seed.js",
+    "db:check": "prisma migrate diff --from-migrations prisma/migrations --to-schema-datamodel prisma/schema.prisma --shadow-database-url \"$SHADOW_DATABASE_URL\" --exit-code",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/swagger": "^11.0.0",
+    "@prisma/client": "^6.16.0",
+    "@saha/shared": "workspace:*",
+    "prisma": "^6.16.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.0",
+    "pg": "^8.13.0",
+    "typescript": "^5.8.0",
+    "vitest": "^3.2.0"
+  }
+}
