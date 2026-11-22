@@ -1,0 +1,18 @@
+# ساحة — نسخة المعاينة
+# تعمل خلف Nginx الموجود على السيرفر (يملك 80 و443)، فالمنفذ مربوط بـ 127.0.0.1 فقط.
+name: saha
+
+services:
+  preview:
+    image: ghcr.io/abtkare/saha-preview:latest
+    container_name: saha-preview
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8097:80"
+    networks:
+      - saha_net
+    mem_limit: 128m
+
+networks:
+  saha_net:
+    name: saha_net
