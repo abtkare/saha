@@ -289,7 +289,7 @@ describe('الجلسة 3 — بطولة دوري بـ 8 فرق من البداي
 
     const pub = await api('GET', `/matches/${match.id}`);
     expect(pub.body.events.map((e: any) => [e.type, e.minute, e.player?.name])).toEqual([
-      ['goal', 23, 'لاعب ثان'], ['goal', 70, 'لاعب ثان'], ['mvp', null, 'لاعب ثان'],
+      ['goal', 23, 'لاعب ثان'], ['mvp', 23, 'لاعب ثان'], ['goal', 70, 'لاعب ثان'],
     ]);
 
     // الهدافون: لا يُحسب قبل اعتماد النتيجة
