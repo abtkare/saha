@@ -437,8 +437,11 @@ saha/
 | الفرق | `POST /teams` · `GET/PATCH /teams/:id` · `GET /me/teams` · `POST /teams/join` (رمز الانضمام) · `POST /me/children/:id/teams` · `POST /teams/:id/join-code` · `GET/POST /teams/:id/players` · `PATCH/DELETE /teams/:id/players/:playerId` · `GET/POST/PATCH /teams/:id/verification` |
 | المباريات | `GET /matches?date=` · `GET /matches/:id` (ومعه الأحداث وحالة التأكيد ومهلة الاعتراض) · `PATCH /matches/:id` (الموعد والملعب والحكم) · `POST /matches/:id/result` (الحكم، مع `sheetMediaId`) · `GET /matches/:id/sheet` (صورة الورقة لأطراف المباراة فقط) · `POST /matches/:id/events` · `DELETE /matches/:id/events/:eventId` · `POST /matches/:id/confirm` · `POST /matches/:id/disputes` · `GET /me/matches` (مباريات الحكم، ونتائج تنتظر تأكيد فرقي) |
 | الإشعارات | `GET /me/notifications?unread=` · `POST /me/notifications/:id/read` · `POST /me/notifications/read-all` |
-| المحتوى | `GET /home/hero` · `POST /hero/:id/events` · `GET /news` · `GET /pages/:slug` |
-| الملفات | `POST /uploads` (multipart بحقل `file`: JPEG/PNG/WebP حتى 5MB، 30 صورة/ساعة؛ التحويل إلى WebP لاحقاً) |
+| المحتوى (عام) | `GET /home/hero` (الشرائح الحيّة + `refreshSeconds: 30`) · `POST /hero/:id/events {type: impression\|click, deviceId}` · `GET /news?limit=` · `GET /news/:slug` · `GET /pages/:slug` · `POST /sponsor-leads` («كن راعياً») · `GET /media/:id` (صور المحتوى العامة) |
+| النتيجة النصية | `PATCH /matches/:id/live {text}` (حكم المباراة أو إدارة البطولة، يوم المباراة وقبل إدخال النتيجة) |
+| بوابة الراعي | `GET /sponsor/me` · `GET /sponsor/report?sponsorId=&from=&to=` · `GET /sponsor/report.csv` |
+| إدارة المحتوى | `GET/POST /admin/slides` · `GET/PATCH /admin/slides/:id` · `POST /admin/slides/:id/submit\|approve\|reject\|archive` · `GET/POST /admin/posts` · `GET/PATCH /admin/posts/:id` · `POST /admin/posts/:id/submit\|publish\|reject\|archive` · `GET/POST /admin/sponsors` · `PATCH /admin/sponsors/:id` · `GET /admin/sponsor-leads?status=` · `PATCH /admin/sponsor-leads/:id` |
+| الملفات | `POST /uploads` (multipart بحقل `file`: JPEG/PNG/WebP حتى 5MB، 30 صورة/ساعة؛ الحقل `purpose=content` لصور المحتوى العامة؛ التحويل إلى WebP لاحقاً) |
 | الإدارة | `/admin/*` لكل ما سبق + `GET /admin/audit/verify` · `GET /admin/tournaments` · `GET /admin/verifications` · `POST /admin/verifications/:id/decide` · `GET /admin/disputes?status=` · `POST /admin/disputes/:id/vote` |
 
 **قواعد عامة:** كل عملية تغيير تُكتب في `audit_log`، والصلاحيات تُفحص في الخادم حسب مصفوفة الأدوار، والأخطاء تُرجع برسالة عربية ورمز ثابت، وSwagger متاح على `/api/docs` للمديرين فقط.
@@ -502,6 +505,19 @@ https://claude.ai/artifact/4yE5e1UHMKrKCDTAk2YCpD
 
 ## سجل التغييرات
 
+- **2026-11-23 — الجلسة 5 (المحتوى والرعاة) أُنجزت:** migration `0006_content`. **قرارات جديدة:**
+  - **دورة الشريحة:** مسودة ← قيد المراجعة ← منشورة ← مؤرشفة. محرر المحتوى يكتب كل الأنواع، ومدير الرعاة شرائح الرعاة فقط ويرى شرائح الرعاة فقط. الاعتماد (`content.publish`) من «قيد المراجعة» فقط، والإرجاع بسبب مكتوب.
+  - **الشريحة المدفوعة** (`type = sponsor`، الثابت `PAID_SLIDE_TYPES`) لا يعتمدها من أنشأها ولا آخر من عدّل محتواها (`updated_by_id`) — حتى المدير العام.
+  - **سحب الاعتماد في القاعدة نفسها:** Trigger `hero_slides_revoke_approval` يسحب الاعتماد عند تغيير أي حقل محتوى (النوع، العنوان، النص، الصورة، الرابط، الراعي، البطولة، المباراة، فترة العرض) فتعود المنشورة «قيد المراجعة». الأولوية لا تُعد محتوى. قيدا CHECK: المنشورة لها `approved_at` و`approved_by_id`.
+  - **الشريحة الحيّة** = منشورة + داخل `starts_at`/`ends_at` (+ بطولة المباراة ليست مسودة). الحد 8 شرائح، الأعلى أولوية أولاً. الرابط `https://` أو مسار داخلي يبدأ بـ `/` فقط.
+  - **«مباراة اليوم»:** شريحة `match` مرتبطة بمباراة؛ النتيجة النصية في `matches.live_text` (80 حرفاً) و`live_text_at`، يكتبها حكم المباراة أو إدارة البطولة من ساعتين قبل الانطلاق حتى 6 ساعات بعده وقبل إدخال النتيجة، ولا تسحب اعتماد الشريحة. بعد إدخال النتيجة يعرض السلايدر النتيجة الرسمية وحالتها. التطبيق والموقع يحدّثان كل 30 ثانية (`HERO_REFRESH_SECONDS`). الشريحة تُحذف مع مباراتها (إعادة القرعة).
+  - **قياس الظهور والنقر:** صف واحد لكل (شريحة، نوع، جهاز، يوم بتوقيت بغداد) بالقيد الفريد الموجود؛ التكرار لا يُحسب. النقرة لا تُحسب إلا بعد ظهور مسجّل للجهاز نفسه في اليوم نفسه. الحدث يُرفض إن لم تكن الشريحة حيّة. معرّف الجهاز 8–64 حرفاً يولّده التطبيق/الموقع ويحفظه. حد 600 حدث/ساعة للـ IP.
+  - **تقرير الراعي:** من جدول الأحداث مباشرة (لا عدّادات منفصلة قد تختلف): الظهور والنقرات ونسبة النقر لكل شريحة ولكل يوم، الافتراضي آخر 30 يوماً وحتى 366 يوماً. نسخة CSV تفتح في Excel (PDF مع واجهة البوابة في الجلسة 6).
+  - **دور «راعٍ» مقيّد براعٍ واحد إلزامياً** (`user_roles.sponsor_id` + CHECK)، ويدخل برقم هاتفه (OTP) بلا TOTP. يُمنح من `POST /admin/users/:id/roles {role: sponsor_viewer, sponsorId}`. مدير الرعاة يرى كل الرعاة.
+  - **الأخبار والصفحات:** مسودة ← قيد المراجعة ← منشور ← مؤرشف. النص عادي بلا HTML (حتى 20000 حرف). الرابط المختصر بأحرف إنجليزية صغيرة وأرقام وشرطات، يُولَّد تلقائياً إن لم يُكتب، ولا يتغير بعد النشر. تعديل المنشور لمن يملك النشر فقط ويُسجَّل العنوان قبل وبعد. لا يؤرشف ما لم يُنشر.
+  - **صور المحتوى:** `media_assets.is_public`؛ تُرفع بـ `purpose=content` (محرر المحتوى ومدير الرعاة)، وتُعرض على `/api/v1/media/:id`. صور أوراق المباريات تبقى خاصة. الشريحة والخبر والراعي تقبل صورة رفعها المستخدم نفسه فقط.
+  - **«كن راعياً»:** جدول `sponsor_leads` (جديد ← تم التواصل ← مغلق) يراه مدير الرعاة. حد 5 طلبات/ساعة للـ IP و3 يومياً للرقم.
+  - **الإشعارات العامة** (رسالة لكل المستخدمين) لم تُضف؛ تُبنى مع Expo Push في الجلسة 7.
 - **2026-11-23 — الجلسة 4 (النتائج والاعتراضات) أُنجزت:** migration `0005_results`. **قرارات جديدة:**
   - **دورة النتيجة** (`RESULT_TRANSITIONS` في `@saha/shared`): لم تبدأ ← مؤقتة (الحكم يدخلها بعد موعد الانطلاق مع صورة الورقة) ← معتمدة (تأكيد مديري الفريقين) ← نهائية (انتهاء النافذة). المؤقتة بلا رد تصبح نهائية مباشرة عند انتهاء النافذة (السكوت قبول). تصحيح الحكم مسموح ما دامت مؤقتة، ويصفّر التأكيدات ويبدأ النافذة من جديد. المعتمدة لا تُعدَّل ولا يُعترض عليها، لكن أحداثها تبقى مفتوحة حتى تصبح نهائية.
   - **النافذة** `dispute_window_hrs` تبدأ من وقت إدخال النتيجة (`result_entered_at`).
