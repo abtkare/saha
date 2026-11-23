@@ -54,6 +54,37 @@ export const RESULT_STATUS_LABELS: Record<ResultStatus, string> = {
   final: 'نهائية',
 };
 
+export const MATCH_EVENT_TYPES = ['goal', 'own_goal', 'yellow_card', 'red_card', 'mvp'] as const;
+export type MatchEventType = (typeof MATCH_EVENT_TYPES)[number];
+export const MATCH_EVENT_LABELS: Record<MatchEventType, string> = {
+  goal: 'هدف',
+  own_goal: 'هدف عكسي',
+  yellow_card: 'بطاقة صفراء',
+  red_card: 'بطاقة حمراء',
+  mvp: 'أفضل لاعب',
+};
+
+/** أدوار البطولة (حقل matches.stage) */
+export const STAGE_LABELS: Record<string, string> = {
+  league: 'الدوري',
+  group: 'دور المجموعات',
+  r64: 'دور الـ64',
+  r32: 'دور الـ32',
+  r16: 'دور الـ16',
+  qf: 'ربع النهائي',
+  sf: 'نصف النهائي',
+  final: 'النهائي',
+};
+
+/** الحد الأعلى للعمر في كل فئة (null = مفتوحة) */
+export const AGE_CATEGORY_MAX: Record<AgeCategory, number | null> = { open: null, u18: 18, u14: 14 };
+
+/** هل يحق للاعب المشاركة في فئة البطولة (بسنة الميلاد، كما في isMinor) */
+export function ageEligible(birthYear: number, category: AgeCategory, now: Date = new Date()): boolean {
+  const max = AGE_CATEGORY_MAX[category];
+  return max === null || now.getFullYear() - birthYear < max;
+}
+
 export const ROLES = [
   'super_admin',
   'content_editor',
