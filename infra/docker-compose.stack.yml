@@ -30,6 +30,7 @@ services:
 
   api:
     image: ghcr.io/abtkare/saha-api:latest
+    pull_policy: always   # زر Update في Docker Manager يسحب آخر نسخة دائماً
     container_name: saha-api
     restart: unless-stopped
     env_file: .env
@@ -42,6 +43,7 @@ services:
 
   web:
     image: ghcr.io/abtkare/saha-web:latest
+    pull_policy: always   # زر Update في Docker Manager يسحب آخر نسخة دائماً
     container_name: saha-web
     restart: unless-stopped
     environment:
