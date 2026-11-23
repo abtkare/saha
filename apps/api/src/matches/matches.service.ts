@@ -14,7 +14,7 @@ export function baghdadToday(now = new Date()): string {
 
 const MATCH_SELECT = {
   id: true, stage: true, round: true, kickoffAt: true, venue: true,
-  homeScore: true, awayScore: true, resultStatus: true, liveText: true,
+  homeScore: true, awayScore: true, resultStatus: true, liveText: true, liveTextAt: true,
   tournament: { select: { id: true, nameAr: true, slug: true, kind: true } },
   homeTeam: { select: { id: true, nameAr: true, logoUrl: true } },
   awayTeam: { select: { id: true, nameAr: true, logoUrl: true } },

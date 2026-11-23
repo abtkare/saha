@@ -140,12 +140,12 @@ export class AuthService {
     if (!p || p.typ !== 'access' || !p.sid) throw UNAUTHORIZED();
     const s = await this.prisma.session.findUnique({
       where: { id: p.sid },
-      select: { revokedAt: true, expiresAt: true, user: { select: { id: true, status: true, roles: { select: { role: true, tournamentId: true, teamId: true } } } } },
+      select: { revokedAt: true, expiresAt: true, user: { select: { id: true, status: true, roles: { select: { role: true, tournamentId: true, teamId: true, sponsorId: true } } } } },
     });
     if (!s || s.revokedAt || s.expiresAt < new Date() || s.user.id !== p.sub) throw UNAUTHORIZED();
     if (s.user.status === 'suspended' || s.user.status === 'deleted') throw new AppError(403, 'ACCOUNT_SUSPENDED', 'هذا الحساب موقوف.');
     // حساب القاصر قبل موافقة ولي الأمر لا يحمل أي صلاحية
-    const grants = s.user.status === 'active' ? s.user.roles.map((r) => ({ role: r.role as Role, tournamentId: r.tournamentId, teamId: r.teamId })) : [];
+    const grants = s.user.status === 'active' ? s.user.roles.map((r) => ({ role: r.role as Role, tournamentId: r.tournamentId, teamId: r.teamId, sponsorId: r.sponsorId })) : [];
     return { userId: s.user.id, sessionId: p.sid, mfa: !!p.mfa, status: s.user.status, grants };
   }
 

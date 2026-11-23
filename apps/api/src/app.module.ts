@@ -11,12 +11,14 @@ import { MatchesService } from './matches/matches.service';
 import { MatchManageController, MatchManageService } from './matches/match-manage';
 import { TeamsController, TeamsPublicController } from './teams/teams.controller';
 import { TeamsService } from './teams/teams.service';
-import { NewsController } from './news/news.controller';
 import { AuthModule } from './auth/auth.module';
 import { ResultsController, ResultsService } from './matches/results';
 import { ResultSweeper } from './matches/result-sweeper';
 import { NotificationsController, NotificationsService } from './notifications/notifications';
-import { UploadsController, UploadsService } from './uploads/uploads';
+import { MediaController, UploadsController, UploadsService } from './uploads/uploads';
+import { HeroController, SlidesAdminController, SlidesService } from './content/slides';
+import { SponsorLeadsPublicController, SponsorsController, SponsorsService } from './content/sponsors';
+import { PostsAdminController, PostsPublicController, PostsService } from './content/posts';
 
 @Module({
   imports: [PrismaModule, AuditModule, AuthModule],
@@ -24,13 +26,14 @@ import { UploadsController, UploadsService } from './uploads/uploads';
     HealthController,
     TournamentsController, TournamentManageController,
     MatchesController, MatchManageController, ResultsController,
-    NotificationsController, UploadsController,
+    NotificationsController, UploadsController, MediaController,
     TeamsPublicController, TeamsController,
-    NewsController,
+    HeroController, SlidesAdminController, SponsorLeadsPublicController, SponsorsController, PostsPublicController, PostsAdminController,
   ],
   providers: [
     TournamentsService, TournamentManageService, MatchesService, MatchManageService, TeamsService,
     ResultsService, ResultSweeper, NotificationsService, UploadsService,
+    SlidesService, SponsorsService, PostsService,
   ],
 })
 export class AppModule {}
