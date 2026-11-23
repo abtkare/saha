@@ -4,7 +4,7 @@ import {
   TOURNAMENT_KIND_LABELS, TOURNAMENT_STATUS_LABELS, TOURNAMENT_FORMAT_LABELS, AGE_CATEGORY_LABELS,
   type TournamentKind, type TournamentStatus, type TournamentFormat, type AgeCategory,
 } from '@saha/shared';
-import { apiGet, type MatchItem, type Standings } from '@/lib/api';
+import { apiGet, type MatchItem, type Standings, type StandingRow } from '@/lib/api';
 import { initial, shortDate } from '@/lib/format';
 import { EmptyCard, MatchCard, StandingsTable } from '@/components/cards';
 import { PitchLines } from '@/components/mark';
@@ -31,10 +31,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 /** صفحة البطولة — غير موجودة في المعاينة، مبنية من مكوناتها نفسها (الهيرو، بطاقة المباراة، الجدول، البطاقات) */
 export default async function TournamentPage({ params }: Props) {
   const { slug } = await params;
-  const [t, standings] = await Promise.all([
+  const [t, standings, scorers] = await Promise.all([
     apiGet<TournamentDetail>(`/tournaments/${encodeURIComponent(slug)}`),
-    apiGet<Standings>(`/tournaments/${encodeURIComponent(slug)}/standings`),
+    apiGet<Standings & { groups?: { label: string; rows: StandingRow[] }[] }>(`/tournaments/${encodeURIComponent(slug)}/standings`),
+    apiGet<{ player: { id: number; name: string }; team: { id: number; nameAr: string }; goals: number }[]>(`/tournaments/${encodeURIComponent(slug)}/scorers`),
   ]);
+  const groups = standings?.groups ?? [];
   if (!t) notFound();
 
   const dates = [shortDate(t.startsOn), shortDate(t.endsOn)].filter(Boolean).join(' – ');
@@ -46,6 +48,7 @@ export default async function TournamentPage({ params }: Props) {
         <PitchLines variant="hero" />
         <div className="wrap hero-in">
           <div className="hero-text">
+            <nav className="crumbs" aria-label="مسار الصفحة"><a href="/tournaments">البطولات</a></nav>
             <div className="chips"><span>{TOURNAMENT_KIND_LABELS[t.kind]}</span><span>{TOURNAMENT_STATUS_LABELS[t.status]}</span></div>
             <h1>{t.nameAr}</h1>
             {details && <p>{details}</p>}
@@ -54,7 +57,7 @@ export default async function TournamentPage({ params }: Props) {
               <span>الفئة: {AGE_CATEGORY_LABELS[t.ageCategory]}</span>
               <span>{t.registrations.length} فرق</span>
             </div>
-            {t.status === 'registration' && <div className="row"><a href="#app" className="btn btn-gold">سجّل فريقك</a></div>}
+            {t.status === 'registration' && <div className="row"><a href="/app" className="btn btn-gold">سجّل فريقك</a></div>}
           </div>
         </div>
       </section>
@@ -69,7 +72,25 @@ export default async function TournamentPage({ params }: Props) {
         </div>
         <div className="split-side">
           <h2>الترتيب</h2>
-          <StandingsTable rows={standings?.rows ?? []} full />
+          {groups.length > 1
+            ? groups.map((g) => <div key={g.label} className="stack"><h3>المجموعة {g.label}</h3><StandingsTable rows={g.rows} full /></div>)
+            : <StandingsTable rows={standings?.rows ?? []} full />}
+          <h2>الهدافون</h2>
+          <div className="card flush scroll-x">
+            <table className="table">
+              <thead><tr><th>#</th><th>اللاعب</th><th>الفريق</th><th>الأهداف</th></tr></thead>
+              <tbody>
+                {(scorers ?? []).length === 0 && <tr><td colSpan={4} className="muted">لا أهداف محسوبة بعد.</td></tr>}
+                {(scorers ?? []).map((x, i) => (
+                  <tr key={x.player.id} className={i === 0 ? 'first' : undefined}>
+                    <td className="num">{i + 1}</td><td>{x.player.name}</td>
+                    <td className="muted"><a href={`/teams/${x.team.id}`} className="plain">{x.team.nameAr}</a></td>
+                    <td className="num pts">{x.goals}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -78,11 +99,11 @@ export default async function TournamentPage({ params }: Props) {
         <div className="grid g240">
           {t.registrations.length === 0 ? <EmptyCard>التسجيل مفتوح — لم تُعتمد فرق بعد.</EmptyCard>
             : t.registrations.map(({ team }) => (
-              <div key={team.id} className="card tour">
+              <a key={team.id} href={`/teams/${team.id}`} className="card tour">
                 <span className="crest">{initial(team.nameAr)}</span>
                 <h3>{team.nameAr}</h3>
                 {team.verifiedAt ? <span className="kind">موثّق</span> : <span className="muted">غير موثّق بعد</span>}
-              </div>
+              </a>
             ))}
         </div>
       </section>

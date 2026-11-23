@@ -182,6 +182,8 @@ export class TournamentManageService {
       orderBy: [{ createdAt: 'desc' }],
       select: {
         id: true, nameAr: true, slug: true, kind: true, format: true, status: true, ageCategory: true, startsOn: true, maxTeams: true, drawnAt: true,
+        city: true, endsOn: true, entryFeeIqd: true, disputeWindowHrs: true, groupCount: true, qualifiersPerGroup: true, doubleRound: true,
+        community: { select: { id: true, nameAr: true } },
         _count: { select: { registrations: { where: { status: { in: ['pending', 'approved'] } } }, matches: true } },
       },
     });
@@ -344,7 +346,7 @@ export class TournamentManageService {
     const t = await this.load(id);
     const matches = await this.prisma.match.findMany({
       where: { tournamentId: id }, orderBy: [{ round: 'asc' }, { id: 'asc' }],
-      select: { id: true, stage: true, round: true, kickoffAt: true, venue: true, resultStatus: true, homeTeam: { select: { id: true, nameAr: true } }, awayTeam: { select: { id: true, nameAr: true } } },
+      select: { id: true, stage: true, round: true, kickoffAt: true, venue: true, resultStatus: true, homeScore: true, awayScore: true, referee: { select: { id: true, fullName: true } }, homeTeam: { select: { id: true, nameAr: true } }, awayTeam: { select: { id: true, nameAr: true } } },
     });
     const groups = await this.prisma.tournamentRegistration.findMany({
       where: { tournamentId: id, status: 'approved', groupLabel: { not: null } }, select: { groupLabel: true, team: { select: { id: true, nameAr: true } } },

@@ -157,3 +157,41 @@ h2{font-size:32px;font-weight:800}
   .splash *{animation-duration:.01ms!important;animation-delay:0s!important}
   html{scroll-behavior:auto}
 }
+
+/* زر الوضع الداكن في الرأس */
+.top-act{display:flex;align-items:center;gap:8px}
+.theme-btn{width:44px;height:44px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:transparent;color:var(--color-ink);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.theme-btn:hover{background:var(--color-bg)}
+.theme-btn .i-sun{display:none}
+[data-theme='dark'] .theme-btn .i-sun{display:block}
+[data-theme='dark'] .theme-btn .i-moon{display:none}
+
+/* الوضع الداكن — ألوانه من docs/PLAN.md (يُفعَّل بزر في الرأس ويُحفظ، والافتراضي فاتح) */
+[data-theme='dark']{
+  --color-primary:#2FA37A;--color-ink:#F6F3EC;--color-bg:#0E1A24;--color-surface:#16252F;
+  --color-muted:#9AA6AE;--color-border:#24343F;--color-danger:#FF5A6E;--color-info:#5C9DFF;
+  color-scheme:dark;
+}
+[data-theme='dark'] .top{background:#12202A}
+[data-theme='dark'] .brand{color:var(--color-primary)}
+[data-theme='dark'] .btn-primary{color:#0E1A24}
+[data-theme='dark'] .btn-primary:hover{background:#3DB98C}
+[data-theme='dark'] .btn-ink{background:#24343F;color:#F6F3EC}
+[data-theme='dark'] .hero{background:#0A5A41}
+[data-theme='dark'] .tabs{background:var(--color-surface)}
+[data-theme='dark'] .tabs button[aria-selected="true"]{color:#0E1A24}
+[data-theme='dark'] .crest,[data-theme='dark'] .kind{background:rgba(47,163,122,.16)}
+[data-theme='dark'] .meta{border-top-color:var(--color-border)}
+[data-theme='dark'] .progress{background:#24343F}
+[data-theme='dark'] .table th{background:#12202A}
+[data-theme='dark'] .table td{border-top-color:var(--color-border)}
+[data-theme='dark'] .news .thumb{background:#1B3A33}
+[data-theme='dark'] .live{box-shadow:0 24px 48px rgba(0,0,0,.4)}
+[data-theme='dark'] .band.light{background:var(--color-surface)}
+[data-theme='dark'] .band.dark{background:#0A141C;border:1px solid var(--color-border)}
+[data-theme='dark'] .foot{background:#0A141C}
+[data-theme='dark'] .s-provisional{background:rgba(92,157,255,.16);color:#8DBBFF}
+[data-theme='dark'] .s-confirmed{background:rgba(47,163,122,.18);color:#5FD3A6}
+[data-theme='dark'] .s-disputed{background:rgba(255,90,110,.16);color:#FF8A99}
+[data-theme='dark'] .s-final{background:rgba(246,243,236,.1);color:#F6F3EC}
+[data-theme='dark'] .s-scheduled{background:#24343F;color:#C9D3D9}

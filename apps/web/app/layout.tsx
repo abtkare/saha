@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import { brand } from '@saha/ui';
 import { BrandSymbols, Mark } from '@/components/mark';
 import { Splash } from '@/components/splash';
+import { THEME_SCRIPT, ThemeToggle } from '@/components/theme-toggle';
 import './saha.css';
+import './saha-pages.css';
 
 export const metadata: Metadata = {
   title: { default: `${brand.name} — ${brand.tagline}`, template: `%s · ${brand.name}` },
@@ -11,13 +13,14 @@ export const metadata: Metadata = {
   robots: process.env.NOINDEX === 'false' ? undefined : { index: false, follow: false },
 };
 
-// التصميم المتفق عليه فاتح فقط؛ الوضع الداكن يُصمَّم لاحقاً (الجلسة 6)
-export const viewport: Viewport = { themeColor: '#0B6E4F', colorScheme: 'light', viewportFit: 'cover' };
+// الافتراضي فاتح؛ الداكن يُفعَّل بزر في الرأس ويُحفظ (لا تحويل تلقائي مع وضع الآيفون)
+export const viewport: Viewport = { themeColor: '#0B6E4F', viewportFit: 'cover' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
@@ -37,11 +40,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
             <nav className="nav" aria-label="القائمة">
               <a href="/#matches">المباريات</a>
-              <a href="/#tournaments">البطولات</a>
-              <a href="/#news">الأخبار</a>
-              <a href="/#sponsor">كن راعياً</a>
+              <a href="/tournaments">البطولات</a>
+              <a href="/news">الأخبار</a>
+              <a href="/sponsor">كن راعياً</a>
             </nav>
-            <a href="/#app" className="btn btn-primary">حمّل التطبيق</a>
+            <div className="top-act">
+              <ThemeToggle />
+              <a href="/app" className="btn btn-primary">حمّل التطبيق</a>
+            </div>
           </div>
         </header>
 
@@ -50,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="foot">
           <div className="wrap foot-in">
             <span className="brand light"><Mark size={32} /><span>{brand.name}</span></span>
-            <nav aria-label="روابط التذييل"><a href="#">الشروط</a><a href="#">الخصوصية</a><a href="#">تواصل معنا</a></nav>
+            <nav aria-label="روابط التذييل"><a href="/terms">الشروط</a><a href="/privacy">الخصوصية</a><a href="/contact">تواصل معنا</a><a href="/sponsor/portal">بوابة الرعاة</a><a href="/admin">الإدارة</a></nav>
             <span>جمعية الميثاق الأعظم · نسخة تجريبية</span>
           </div>
         </footer>

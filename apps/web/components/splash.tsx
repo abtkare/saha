@@ -4,14 +4,14 @@ import { MARK_PATH, PitchLines } from './mark';
 
 /**
  * شاشة البداية المتحركة — منقولة حرفياً من apps/preview (الحركة كلها CSS في saha.css).
- * تظهر مرة واحدة في كل جلسة، واللمس يتخطاها. السكربت يعمل فوراً قبل React (كما في المعاينة)
+ * تظهر مرة واحدة في كل جلسة وفي الرئيسية فقط، واللمس يتخطاها. السكربت يعمل فوراً قبل React (كما في المعاينة)
  * حتى لا تومض الشاشة لمن رآها.
  */
 const SCRIPT = `(function(){var s=document.getElementById('splash');if(!s)return;
 var r=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches,seen=false;
 try{seen=sessionStorage.getItem('saha_splash')==='1'}catch(e){}
 function hide(){if(s.classList.contains('out'))return;s.classList.add('out');document.body.classList.remove('locked');try{sessionStorage.setItem('saha_splash','1')}catch(e){}}
-if(seen){s.classList.add('out');s.style.display='none'}else{document.body.classList.add('locked');s.addEventListener('click',hide);setTimeout(hide,r?900:3900)}})();`;
+if(seen||location.pathname!=='/'){s.classList.add('out');s.style.display='none'}else{document.body.classList.add('locked');s.addEventListener('click',hide);setTimeout(hide,r?900:3900)}})();`;
 
 const PATCHES = [
   '0.00,-3.70 3.52,-1.14 2.17,2.99 -2.17,2.99 -3.52,-1.14',
