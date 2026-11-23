@@ -191,7 +191,10 @@ model User {
   feeRecords          TournamentRegistration[]
   createdSlides       HeroSlide[]               @relation("SlideCreator")
   approvedSlides      HeroSlide[]               @relation("SlideApprover")
-  posts               Post[]
+  editedSlides        HeroSlide[]               @relation("SlideEditor")
+  posts               Post[]                    @relation("PostAuthor")
+  editedPosts         Post[]                    @relation("PostEditor")
+  handledSponsorLeads SponsorLead[]
   mediaAssets         MediaAsset[]
   notifications       Notification[]
 
@@ -206,13 +209,17 @@ model UserRole {
   role         RoleName
   tournamentId Int?     @map("tournament_id")
   teamId       Int?     @map("team_id")
+  /// دور «راعٍ» (بوابة الراعي) مقيّد براعٍ واحد إلزامياً
+  sponsorId    Int?     @map("sponsor_id")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   tournament Tournament? @relation(fields: [tournamentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   team       Team?       @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  sponsor    Sponsor?    @relation(fields: [sponsorId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([userId])
+  @@index([sponsorId])
   @@map("user_roles")
 }
 
@@ -430,6 +437,7 @@ model Match {
   resultStatus   ResultStatus @default(scheduled) @map("result_status")
   /// نتيجة نصية مباشرة يحدّثها الحكم (شريحة «مباراة اليوم»)
   liveText       String?      @map("live_text")
+  liveTextAt     DateTime?    @map("live_text_at") @db.Timestamptz(3)
   sheetPhotoUrl  String?      @map("sheet_photo_url")
   /// صورة ورقة المباراة المرفوعة (لا تُعرض للعامة)
   sheetMediaId   Int?         @map("sheet_media_id")
@@ -530,7 +538,8 @@ model Sponsor {
   contactPhone String?  @map("contact_phone")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  slides HeroSlide[]
+  slides  HeroSlide[]
+  viewers UserRole[]
 
   @@map("sponsors")
 }
@@ -552,17 +561,23 @@ model HeroSlide {
   approvedById Int?          @map("approved_by_id")
   approvedAt   DateTime?     @map("approved_at") @db.Timestamptz(3)
   createdById  Int?          @map("created_by_id")
+  /// آخر من عدّل المحتوى (لا يعتمد شريحة الراعي من أنشأها أو عدّلها)
+  updatedById  Int?          @map("updated_by_id")
+  /// سبب الإرجاع للمسودة عند رفض المراجعة
+  reviewNote   String?       @map("review_note")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   sponsor    Sponsor?     @relation(fields: [sponsorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   tournament Tournament?  @relation(fields: [tournamentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  match      Match?       @relation(fields: [matchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  match      Match?       @relation(fields: [matchId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   approvedBy User?        @relation("SlideApprover", fields: [approvedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdBy  User?        @relation("SlideCreator", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedBy  User?        @relation("SlideEditor", fields: [updatedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
   events     SlideEvent[]
 
   @@index([status, priority])
+  @@index([sponsorId])
   @@map("hero_slides")
 }
 
@@ -582,6 +597,26 @@ model SlideEvent {
   @@map("slide_events")
 }
 
+/// طلبات «كن راعياً» من الموقع
+model SponsorLead {
+  id          Int      @id @default(autoincrement())
+  fullName    String   @map("full_name")
+  orgName     String?  @map("org_name")
+  phone       String
+  message     String?
+  /// new | contacted | closed
+  status      String   @default("new")
+  ip          String?
+  handledById Int?     @map("handled_by_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  handledBy User? @relation(fields: [handledById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([status, createdAt])
+  @@map("sponsor_leads")
+}
+
 // ───────────── المحتوى ─────────────
 
 model Post {
@@ -594,10 +629,13 @@ model Post {
   status      ContentStatus @default(draft)
   publishedAt DateTime?     @map("published_at") @db.Timestamptz(3)
   authorId    Int?          @map("author_id")
+  updatedById Int?          @map("updated_by_id")
+  reviewNote  String?       @map("review_note")
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  author    User? @relation("PostAuthor", fields: [authorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedBy User? @relation("PostEditor", fields: [updatedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([type, status, publishedAt])
   @@map("posts")
@@ -611,6 +649,8 @@ model MediaAsset {
   width        Int?
   height       Int?
   uploadedById Int?     @map("uploaded_by_id")
+  /// صور المحتوى (الأخبار والشرائح وشعارات الرعاة) تُعرض للعامة؛ صور أوراق المباريات خاصة
+  isPublic     Boolean  @default(false) @map("is_public")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   uploadedBy User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Cascade)

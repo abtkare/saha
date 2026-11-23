@@ -177,13 +177,13 @@ export const ROLE_LABELS: Record<Role, string> = {
   sponsor_viewer: 'راعٍ',
 };
 
-export interface RoleGrant { role: Role; tournamentId?: number | null; teamId?: number | null }
-export interface PermissionScope { tournamentId?: number | null; teamId?: number | null }
+export interface RoleGrant { role: Role; tournamentId?: number | null; teamId?: number | null; sponsorId?: number | null }
+export interface PermissionScope { tournamentId?: number | null; teamId?: number | null; sponsorId?: number | null }
 
 /**
  * هل تمنح أدوار المستخدم الصلاحية في هذا النطاق؟
  * - الدور بلا نطاق يعمل في كل البطولات/الفرق.
- * - الدور المقيّد ببطولة أو فريق لا يعمل إلا إن طابق النطاق المطلوب.
+ * - الدور المقيّد ببطولة أو فريق أو راعٍ لا يعمل إلا إن طابق النطاق المطلوب.
  * - أدوار الإدارة (MFA_ROLES) تُهمل إن لم يكن الدخول بـ TOTP.
  */
 export function hasPermission(grants: readonly RoleGrant[], permission: Permission, scope: PermissionScope = {}, mfa = false): boolean {
@@ -192,6 +192,7 @@ export function hasPermission(grants: readonly RoleGrant[], permission: Permissi
     if (!ROLE_PERMISSIONS[g.role]?.includes(permission)) return false;
     if (g.tournamentId != null && g.tournamentId !== scope.tournamentId) return false;
     if (g.teamId != null && g.teamId !== scope.teamId) return false;
+    if (g.sponsorId != null && g.sponsorId !== scope.sponsorId) return false;
     return true;
   });
 }
@@ -206,4 +207,52 @@ export function normalizeIraqiPhone(input: string): string | null {
   const digits = String(input).replace(/[\s\-()]/g, '').replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
   const m = digits.match(/^(?:\+964|00964|964)?0?(7\d{9})$/);
   return m ? `+964${m[1]}` : null;
+}
+
+// ───────────── المحتوى والرعاة (الجلسة 5) ─────────────
+
+export const CONTENT_STATUSES = ['draft', 'review', 'published', 'archived'] as const;
+export type ContentStatus = (typeof CONTENT_STATUSES)[number];
+export const CONTENT_STATUS_LABELS: Record<ContentStatus, string> = {
+  draft: 'مسودة',
+  review: 'قيد المراجعة',
+  published: 'منشور',
+  archived: 'مؤرشف',
+};
+
+export const SLIDE_TYPES = ['sponsor', 'news', 'match', 'tournament', 'promo'] as const;
+export type SlideType = (typeof SLIDE_TYPES)[number];
+export const SLIDE_TYPE_LABELS: Record<SlideType, string> = {
+  sponsor: 'شريحة راعٍ (مدفوعة)',
+  news: 'خبر',
+  match: 'مباراة اليوم',
+  tournament: 'بطولة',
+  promo: 'إعلان من ساحة',
+};
+/** الشرائح المدفوعة: تحتاج اعتماداً من شخص غير الذي أنشأها أو عدّلها */
+export const PAID_SLIDE_TYPES: readonly SlideType[] = ['sponsor'];
+
+export const SLIDE_EVENT_TYPES = ['impression', 'click'] as const;
+export type SlideEventType = (typeof SLIDE_EVENT_TYPES)[number];
+
+/** التطبيق والموقع يعيدان طلب السلايدر كل 30 ثانية (النتيجة النصية لشريحة «مباراة اليوم») */
+export const HERO_REFRESH_SECONDS = 30;
+export const HERO_MAX_SLIDES = 8;
+export const LIVE_TEXT_MAX = 80;
+
+export const POST_TYPES = ['news', 'page'] as const;
+export type PostType = (typeof POST_TYPES)[number];
+export const POST_TYPE_LABELS: Record<PostType, string> = { news: 'خبر', page: 'صفحة' };
+
+export const SPONSOR_LEAD_STATUSES = ['new', 'contacted', 'closed'] as const;
+export type SponsorLeadStatus = (typeof SPONSOR_LEAD_STATUSES)[number];
+export const SPONSOR_LEAD_STATUS_LABELS: Record<SponsorLeadStatus, string> = {
+  new: 'جديد',
+  contacted: 'تم التواصل',
+  closed: 'مغلق',
+};
+
+/** نسبة النقر إلى الظهور بنسبة مئوية بمنزلتين (0 إن لم يكن ظهور) */
+export function ctr(impressions: number, clicks: number): number {
+  return impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : 0;
 }
