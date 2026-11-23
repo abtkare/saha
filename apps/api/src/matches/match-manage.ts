@@ -13,7 +13,8 @@ type Ctx = { auth: AuthContext; ip: string };
 
 /**
  * إدارة المباراة: تعديل الموعد والملعب والحكم (مدير البطولة)، وأحداث المباراة (الحكم المعيَّن أو مدير البطولة).
- * إدخال النتيجة وتأكيدها والاعتراض في الجلسة 4.
+ * إدخال النتيجة وتأكيدها والاعتراض في matches/results.ts (الجلسة 4).
+ * الأحداث تُقفل أثناء الاعتراض (القرار للجنة) وبعد النتيجة النهائية.
  */
 @Injectable()
 export class MatchManageService {
@@ -69,6 +70,7 @@ export class MatchManageService {
     const m = await this.load(id);
     this.assertCanRecord(auth, m);
     if (m.resultStatus === 'final') throw new AppError(409, 'MATCH_FINAL', 'نتيجة المباراة نهائية؛ لا تُضاف أحداث.');
+    if (m.resultStatus === 'disputed') throw new AppError(409, 'MATCH_DISPUTED', 'النتيجة قيد الاعتراض؛ لا تُضاف أحداث حتى تبت لجنة الانضباط.');
     const type = oneOf(body, 'type', MATCH_EVENT_TYPES, { label: 'نوع الحدث' })! as MatchEventType;
     const teamId = int(body, 'teamId', { min: 1, label: 'الفريق' })!;
     if (teamId !== m.homeTeamId && teamId !== m.awayTeamId) throw new AppError(400, 'TEAM_NOT_IN_MATCH', 'الفريق ليس طرفاً في هذه المباراة.');
@@ -95,6 +97,7 @@ export class MatchManageService {
     const m = await this.load(id);
     this.assertCanRecord(auth, m);
     if (m.resultStatus === 'final') throw new AppError(409, 'MATCH_FINAL', 'نتيجة المباراة نهائية؛ لا تُحذف أحداث.');
+    if (m.resultStatus === 'disputed') throw new AppError(409, 'MATCH_DISPUTED', 'النتيجة قيد الاعتراض؛ لا تُحذف أحداث حتى تبت لجنة الانضباط.');
     const ev = await this.prisma.matchEvent.findFirst({ where: { id: eventId, matchId: id } });
     if (!ev) throw new AppError(404, 'EVENT_NOT_FOUND', 'الحدث غير موجود.');
     await this.prisma.matchEvent.delete({ where: { id: eventId } });

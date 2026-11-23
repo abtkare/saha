@@ -13,16 +13,24 @@ import { TeamsController, TeamsPublicController } from './teams/teams.controller
 import { TeamsService } from './teams/teams.service';
 import { NewsController } from './news/news.controller';
 import { AuthModule } from './auth/auth.module';
+import { ResultsController, ResultsService } from './matches/results';
+import { ResultSweeper } from './matches/result-sweeper';
+import { NotificationsController, NotificationsService } from './notifications/notifications';
+import { UploadsController, UploadsService } from './uploads/uploads';
 
 @Module({
   imports: [PrismaModule, AuditModule, AuthModule],
   controllers: [
     HealthController,
     TournamentsController, TournamentManageController,
-    MatchesController, MatchManageController,
+    MatchesController, MatchManageController, ResultsController,
+    NotificationsController, UploadsController,
     TeamsPublicController, TeamsController,
     NewsController,
   ],
-  providers: [TournamentsService, TournamentManageService, MatchesService, MatchManageService, TeamsService],
+  providers: [
+    TournamentsService, TournamentManageService, MatchesService, MatchManageService, TeamsService,
+    ResultsService, ResultSweeper, NotificationsService, UploadsService,
+  ],
 })
 export class AppModule {}

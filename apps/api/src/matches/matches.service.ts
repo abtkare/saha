@@ -3,6 +3,7 @@ import { TIMEZONE } from '@saha/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/arabic-error.filter';
 import { PUBLIC_PLAYER_SELECT, publicPlayerName } from '../teams/players';
+import { disputeDeadline } from './result-flow';
 
 const BAGHDAD_OFFSET = '+03:00'; // العراق بلا توقيت صيفي
 
@@ -44,12 +45,19 @@ export class MatchesService {
       where: { id: Number(id), tournament: { status: { not: 'draft' } } },
       select: {
         ...MATCH_SELECT, homePens: true, awayPens: true,
+        homeConfirmed: true, awayConfirmed: true, resultEnteredAt: true, finalizedAt: true, sheetMediaId: true,
+        tournament: { select: { id: true, nameAr: true, slug: true, kind: true, disputeWindowHrs: true } },
+        disputes: { orderBy: { id: 'asc' }, select: { id: true, status: true, decision: true, teamId: true, createdAt: true, decidedAt: true } },
         events: { orderBy: [{ minute: 'asc' }, { id: 'asc' }], select: { id: true, type: true, minute: true, teamId: true, player: { select: PUBLIC_PLAYER_SELECT } } },
       },
     });
     if (!m) throw new AppError(404, 'MATCH_NOT_FOUND', 'المباراة غير موجودة.');
+    const { sheetMediaId, ...rest } = m;
+    const open = m.resultStatus === 'provisional' || m.resultStatus === 'confirmed';
     return {
-      ...m,
+      ...rest,
+      hasSheet: sheetMediaId !== null,
+      disputeDeadline: open ? disputeDeadline(m.resultEnteredAt, m.tournament.disputeWindowHrs) : null,
       events: m.events.map((e) => ({ id: e.id, type: e.type, minute: e.minute, teamId: e.teamId, player: e.player ? { id: e.player.id, name: publicPlayerName(e.player) } : null })),
     };
   }
