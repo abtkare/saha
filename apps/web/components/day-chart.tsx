@@ -18,7 +18,7 @@ export function DayChart({ days, values, label, tone = 'primary' }: { days: stri
           const x = W - (i + 0.5) * step - bw / 2; // اليوم الأول على اليمين
           return (
             <g key={days[i]}>
-              <rect x={x} y={H - PAD_B - h} width={bw} height={Math.max(v ? 1 : 0, h)} rx="2" className={`bar ${tone}`}><title>{`${days[i]}: ${v}`}</title></rect>
+              <rect x={x} y={H - PAD_B - h} width={bw} height={Math.max(v ? 1 : 0, h)} rx="2" className={`c-bar ${tone}`}><title>{`${days[i]}: ${v}`}</title></rect>
               {i === peakI && v > 0 && <text x={x + bw / 2} y={H - PAD_B - h - 5} textAnchor="middle" className="val">{v}</text>}
               {i % tick === 0 && <text x={x + bw / 2} y={H - 6} textAnchor="middle" className="tick">{days[i].slice(5).replace('-', '/')}</text>}
             </g>
