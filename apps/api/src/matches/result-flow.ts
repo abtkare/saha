@@ -21,7 +21,7 @@ export function windowOpen(enteredAt: Date | null, windowHrs: number, now = new 
   return !!d && now < d;
 }
 
-export interface Score { homeScore: number; awayScore: number; homePens: number | null; awayPens: number | null }
+export type Score = { homeScore: number; awayScore: number; homePens: number | null; awayPens: number | null };
 
 /** يتحقق من النتيجة: ركلات الترجيح في الأدوار الإقصائية فقط وعند التعادل فقط، وإلزامية عند تعادل إقصائي. يعيد رمز الخطأ أو null. */
 export function scoreError(s: Score, knockout: boolean): null | 'PENS_PAIR' | 'PENS_NOT_ALLOWED' | 'PENS_REQUIRED' | 'PENS_TIE' {
