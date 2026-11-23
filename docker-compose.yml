@@ -40,6 +40,8 @@ services:
       SEED_DEMO: ${SEED_DEMO:-true}
       OTP_PROVIDER: dev
       SWAGGER_ENABLED: "true"
+      JWT_SECRET: ${JWT_SECRET:-dev_only_jwt_secret_0123456789abcdef0123456789}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev_only_refresh_secret_0123456789abcdef01234}
     volumes: [saha_uploads:/data/uploads]
     networks: [saha_net]
 

@@ -19,7 +19,11 @@ export default async function Home() {
   ]);
   const days = [yesterday ?? [], today ?? [], tomorrow ?? []];
   const featured = pickFeatured(days[0], days[1], days[2]);
-  const active = (tournaments ?? []).filter((t) => t.status === 'running' || t.status === 'registration');
+  // الجارية أولاً ثم المفتوحة للتسجيل، والأقرب موعداً أولاً
+  const rank = (t: TournamentSummary) => (t.status === 'running' ? 0 : 1);
+  const active = (tournaments ?? [])
+    .filter((t) => t.status === 'running' || t.status === 'registration')
+    .sort((a, b) => rank(a) - rank(b) || String(a.startsOn).localeCompare(String(b.startsOn)));
   const leading = active.find((t) => t.status === 'running');
   const standings = leading ? await apiGet<Standings>(`/tournaments/${leading.slug}/standings`) : null;
 

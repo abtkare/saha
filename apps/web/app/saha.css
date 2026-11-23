@@ -168,4 +168,5 @@ a.card:hover{border-color:#C9C2B2}
 .hero.page .hero-in{padding-top:56px;padding-bottom:56px}
 .hero.page h1{font-size:44px}
 .tour .crest{align-self:flex-start}
+.split-side{min-width:0} /* الجدول يتمرر داخل بطاقته بدل أن يوسّع الصفحة على الجوال */
 @media (max-width:640px){.hero.page h1{font-size:32px}}
