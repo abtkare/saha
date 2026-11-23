@@ -11,6 +11,11 @@ export class TournamentsController {
     return this.tournaments.list(kind);
   }
 
+  @Get(':id/standings')
+  standings(@Param('id') id: string) {
+    return this.tournaments.standings(id);
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.tournaments.get(id);

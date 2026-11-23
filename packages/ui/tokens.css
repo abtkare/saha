@@ -26,15 +26,4 @@
   --color-danger: #FF5A6E;
   --color-info: #5C9DFF;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --color-primary: #2FA37A;
-    --color-ink: #F6F3EC;
-    --color-bg: #0E1A24;
-    --color-surface: #16252F;
-    --color-muted: #9AA6AE;
-    --color-border: #24343F;
-    --color-danger: #FF5A6E;
-    --color-info: #5C9DFF;
-  }
-}
+/* لا تبديل تلقائي للوضع الداكن: التصميم المتفق عليه فاتح، والداكن يُفعَّل صراحةً بـ data-theme='dark' (الجلسة 6). */

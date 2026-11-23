@@ -121,6 +121,30 @@ jobs:
           echo "$html" | grep -q "كل جمهور يستحق بطولته"
           echo "$html" | grep -q "بطولة ساحات بغداد الشعبية"
           curl -sf localhost:8098/tournaments/baghdad-sahat-2026 | grep -q "شباب الكرادة"
+          curl -sf "localhost:8098/api/v1/matches" | grep -q homeTeam
+          curl -sf "localhost:8098/api/v1/tournaments/baghdad-sahat-2026/standings" | grep -q points
+          curl -sf "localhost:8098/api/v1/news" | grep -q saha-launch
+          echo "$html" | grep -q 'class="splash'
+          echo "$html" | grep -q 'البطولات الجارية'
+
+      - name: لقطات المقارنة البصرية (المعاينة مقابل الموقع)
+        run: |
+          mkdir -p shots
+          (cd apps/preview/public && python3 -m http.server 8099 >/dev/null 2>&1 &)
+          sleep 2
+          shot() { google-chrome --headless=new --no-sandbox --hide-scrollbars --force-device-scale-factor=1 \
+            --virtual-time-budget=7000 --window-size="$3" --screenshot="shots/$1.png" "$2" 2>/dev/null; }
+          shot 1-preview-desktop http://localhost:8099/ 1440,3100
+          shot 1-web-desktop http://localhost:8098/ 1440,3100
+          shot 2-preview-mobile http://localhost:8099/ 390,5200
+          shot 2-web-mobile http://localhost:8098/ 390,5200
+          shot 3-web-tournament http://localhost:8098/tournaments/baghdad-sahat-2026 1440,2600
+          shot 4-web-tournament-mobile http://localhost:8098/tournaments/baghdad-sahat-2026 390,4400
+          ls -la shots
+
+      - name: رفع اللقطات
+        uses: actions/upload-artifact@v4
+        with: { name: visual-compare, path: shots, retention-days: 14 }
 
       - name: السجلات عند الفشل
         if: failure()

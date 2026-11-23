@@ -1,60 +1,80 @@
-import Link from 'next/link';
-import { brand } from '@saha/ui';
-import {
-  TOURNAMENT_KINDS, TOURNAMENT_KIND_LABELS, TOURNAMENT_STATUS_LABELS, TOURNAMENT_FORMAT_LABELS, AGE_CATEGORY_LABELS,
-  type TournamentKind,
-} from '@saha/shared';
-import { apiGet, type TournamentSummary } from '@/lib/api';
+import { TOURNAMENT_KINDS, TOURNAMENT_KIND_LABELS } from '@saha/shared';
+import { apiGet, type MatchItem, type NewsItem, type Standings, type TournamentSummary } from '@/lib/api';
+import { baghdadDate, pickFeatured } from '@/lib/format';
+import { EmptyCard, LiveCard, NewsCard, StandingsTable, TourCard } from '@/components/cards';
+import { MatchTabs } from '@/components/match-tabs';
+import { PitchLines } from '@/components/mark';
+import { AppBand } from '@/components/app-band';
 
 export const dynamic = 'force-dynamic';
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ kind?: string }> }) {
-  const { kind } = await searchParams;
-  const active = (TOURNAMENT_KINDS as readonly string[]).includes(kind ?? '') ? (kind as TournamentKind) : undefined;
-  const tournaments = await apiGet<TournamentSummary[]>(`/tournaments${active ? `?kind=${active}` : ''}`);
+/** الرئيسية — نقل حرفي لـ apps/preview/public/index.html مع بيانات الـ API */
+export default async function Home() {
+  const [yesterday, today, tomorrow, tournaments, news] = await Promise.all([
+    apiGet<MatchItem[]>(`/matches?date=${baghdadDate(-1)}`),
+    apiGet<MatchItem[]>(`/matches?date=${baghdadDate(0)}`),
+    apiGet<MatchItem[]>(`/matches?date=${baghdadDate(1)}`),
+    apiGet<TournamentSummary[]>('/tournaments'),
+    apiGet<NewsItem[]>('/news?limit=3'),
+  ]);
+  const days = [yesterday ?? [], today ?? [], tomorrow ?? []];
+  const featured = pickFeatured(days[0], days[1], days[2]);
+  const active = (tournaments ?? []).filter((t) => t.status === 'running' || t.status === 'registration');
+  const leading = active.find((t) => t.status === 'running');
+  const standings = leading ? await apiGet<Standings>(`/tournaments/${leading.slug}/standings`) : null;
 
   return (
     <>
       <section className="hero">
-        <h1>{brand.tagline}</h1>
-        <p>بطولات كرة قدم منظّمة للفرق الشعبية، ولمتابعي المؤثرين وصنّاع المحتوى، ولأعضاء مجموعات فيسبوك.</p>
-        <div className="kinds" aria-label="نوع البطولة">
-          <Link href="/#tournaments" className={`kind-chip ${!active ? 'active' : ''}`}>الكل</Link>
-          {TOURNAMENT_KINDS.map((k) => (
-            <Link key={k} href={`/?kind=${k}#tournaments`} className={`kind-chip ${active === k ? 'active' : ''}`}>
-              {TOURNAMENT_KIND_LABELS[k]}
-            </Link>
-          ))}
+        <PitchLines variant="hero" />
+        <div className="wrap hero-in">
+          <div className="hero-text">
+            <h1>كل جمهور<br />يستحق بطولته</h1>
+            <p>بطولات للفرق الشعبية، ولمتابعي المؤثرين وصنّاع المحتوى، ولأعضاء مجموعات فيسبوك. سجّل فريقك وتابع النتائج والترتيب لحظة بلحظة، بنتائج يعتمدها الحكم ويؤكدها مديرا الفريقين.</p>
+            <div className="chips">{TOURNAMENT_KINDS.map((k) => <span key={k}>{TOURNAMENT_KIND_LABELS[k]}</span>)}</div>
+            <div className="row"><a href="#app" className="btn btn-gold">سجّل فريقك</a><a href="#tournaments" className="btn btn-ghost">تصفّح البطولات</a></div>
+          </div>
+          {featured && <LiveCard m={featured.match} label={featured.label} />}
         </div>
       </section>
 
-      <div className="section-head" id="tournaments">
-        <h2>البطولات</h2>
-        {tournaments && <span className="muted">{tournaments.length} بطولة</span>}
-      </div>
+      <MatchTabs days={days} failed={today === null} />
 
-      {tournaments === null ? (
-        <div className="empty">الخادم غير متاح الآن. حاول بعد قليل.</div>
-      ) : tournaments.length === 0 ? (
-        <div className="empty">لا توجد بطولات من هذا النوع بعد.</div>
-      ) : (
-        <div className="grid">
-          {tournaments.map((t) => (
-            <Link key={t.id} href={`/tournaments/${t.slug}`} className="card">
-              <span className={`badge k-${t.kind}`}>{TOURNAMENT_KIND_LABELS[t.kind]}</span>
-              <h3>{t.nameAr}</h3>
-              {t.community && <span className="meta">يستضيفها: {t.community.nameAr}</span>}
-              <span className="meta">
-                {TOURNAMENT_STATUS_LABELS[t.status]} · {TOURNAMENT_FORMAT_LABELS[t.format]} · {AGE_CATEGORY_LABELS[t.ageCategory]}
-                {t.city ? ` · ${t.city}` : ''}
-              </span>
-              <span className="meta">
-                الفرق <span className="num">{t._count.registrations}</span> · المباريات <span className="num">{t._count.matches}</span>
-              </span>
-            </Link>
-          ))}
+      <section id="tournaments" className="wrap sec split">
+        <div className="split-main">
+          <h2>البطولات الجارية</h2>
+          <div className="grid g240">
+            {tournaments === null ? <EmptyCard>تعذّر تحميل البطولات الآن. حاول بعد قليل.</EmptyCard>
+              : active.length === 0 ? <EmptyCard>لا توجد بطولات جارية الآن.</EmptyCard>
+              : active.map((t) => <TourCard key={t.id} t={t} />)}
+          </div>
         </div>
-      )}
+        <div className="split-side">
+          <h2>الترتيب</h2>
+          <StandingsTable rows={standings?.rows.slice(0, 5) ?? []} />
+        </div>
+      </section>
+
+      <section id="news" className="wrap sec">
+        <h2>آخر الأخبار</h2>
+        <div className="grid g300">
+          {!news || news.length === 0 ? <EmptyCard>لا توجد أخبار منشورة بعد.</EmptyCard> : news.map((n) => <NewsCard key={n.id} n={n} />)}
+        </div>
+      </section>
+
+      <section id="sponsor" className="wrap sec">
+        <div className="band dark">
+          <div className="band-text">
+            <span className="badge gold">برعاية</span>
+            <h2>اجعل علامتك حاضرة أمام كل جمهور</h2>
+            <p>شرائح رعاية في التطبيق والموقع، وتقارير ظهور ونقرات مفصّلة، ومنح باسمك للاعبين في المدرسة لاحقاً.</p>
+          </div>
+          <a href="#" className="btn btn-gold">كن راعياً</a>
+        </div>
+      </section>
+
+      <AppBand />
     </>
   );
 }
+

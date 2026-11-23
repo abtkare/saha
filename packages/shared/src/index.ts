@@ -47,7 +47,7 @@ export const AGE_CATEGORY_LABELS: Record<AgeCategory, string> = {
 export const RESULT_STATUSES = ['scheduled', 'provisional', 'confirmed', 'disputed', 'final'] as const;
 export type ResultStatus = (typeof RESULT_STATUSES)[number];
 export const RESULT_STATUS_LABELS: Record<ResultStatus, string> = {
-  scheduled: 'لم تُلعب',
+  scheduled: 'لم تبدأ',
   provisional: 'مؤقتة',
   confirmed: 'معتمدة',
   disputed: 'متنازع عليها',

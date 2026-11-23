@@ -1,0 +1,97 @@
+import { RESULT_STATUS_LABELS, TOURNAMENT_KIND_LABELS, TOURNAMENT_FORMAT_LABELS } from '@saha/shared';
+import type { MatchItem, StandingRow, TournamentSummary, NewsItem } from '@/lib/api';
+import { initial, kickoffDay, kickoffTime, relativeTime, scoreText, signed, tournamentProgress } from '@/lib/format';
+import { Mark, Trophy } from './mark';
+
+/** بطاقة المباراة — .card.match من المعاينة */
+export function MatchCard({ m, tournamentName, withDay = false }: { m: MatchItem; tournamentName?: string; withDay?: boolean }) {
+  const href = m.tournament ? `/tournaments/${m.tournament.slug}` : undefined;
+  const body = (
+    <>
+      <div className="between">
+        <span className="muted">{tournamentName ?? m.tournament?.nameAr}</span>
+        <span className={`badge s-${m.resultStatus}`}>{RESULT_STATUS_LABELS[m.resultStatus]}</span>
+      </div>
+      <div className="vs"><b>{m.homeTeam.nameAr}</b><span className="num score">{scoreText(m)}</span><b>{m.awayTeam.nameAr}</b></div>
+      <div className="meta">{withDay && <span>{kickoffDay(m.kickoffAt)}</span>}<span className="num">{kickoffTime(m.kickoffAt)}</span>{m.venue && <span>{m.venue}</span>}</div>
+    </>
+  );
+  return href ? <a href={href} className="card match">{body}</a> : <div className="card match">{body}</div>;
+}
+
+/** بطاقة «مباراة اليوم» في الهيرو — .card.live من المعاينة */
+export function LiveCard({ m, label }: { m: MatchItem; label: string }) {
+  const status = m.resultStatus === 'scheduled' ? RESULT_STATUS_LABELS.scheduled : `نتيجة ${RESULT_STATUS_LABELS[m.resultStatus]}`;
+  return (
+    <article className="card live">
+      <div className="between"><span className="muted">{label} · {m.tournament?.nameAr}</span><span className={`badge s-${m.resultStatus}`}>{status}</span></div>
+      <div className="vs">
+        <div className="team"><span className="crest lg">{initial(m.homeTeam.nameAr)}</span><b>{m.homeTeam.nameAr}</b></div>
+        <span className="num score-lg">{scoreText(m)}</span>
+        <div className="team"><span className="crest lg">{initial(m.awayTeam.nameAr)}</span><b>{m.awayTeam.nameAr}</b></div>
+      </div>
+      <div className="meta">{m.venue && <span>{m.venue}</span>}<span className="num">{kickoffTime(m.kickoffAt)}</span></div>
+      {m.tournament && <a href={`/tournaments/${m.tournament.slug}`} className="more">تفاصيل المباراة</a>}
+    </article>
+  );
+}
+
+/** بطاقة البطولة — .card.tour من المعاينة */
+export function TourCard({ t }: { t: TournamentSummary }) {
+  const { pct, label } = tournamentProgress(t);
+  const teams = t.status === 'registration' && t.maxTeams ? t.maxTeams : t._count.registrations;
+  return (
+    <a href={`/tournaments/${t.slug}`} className="card tour">
+      <span className="ico"><Trophy /></span>
+      <span className="kind">{TOURNAMENT_KIND_LABELS[t.kind]}</span>
+      <h3>{t.nameAr}</h3>
+      <span className="muted">{[t.city, `${teams} فرق`, TOURNAMENT_FORMAT_LABELS[t.format]].filter(Boolean).join(' · ')}</span>
+      <span className="progress"><i style={{ width: `${pct}%` }} /></span>
+      <span className="muted">{label}</span>
+    </a>
+  );
+}
+
+/** جدول الترتيب — .table من المعاينة. full = كل الأعمدة (صفحة البطولة) */
+export function StandingsTable({ rows, full = false }: { rows: StandingRow[]; full?: boolean }) {
+  return (
+    <div className="card flush scroll-x">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>#</th><th>الفريق</th><th>لعب</th>
+            {full && <><th>فاز</th><th>تعادل</th><th>خسر</th></>}
+            <th>الفارق</th><th>النقاط</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.length === 0 && <tr><td colSpan={full ? 8 : 5} className="muted">لم تُعتمد فرق بعد.</td></tr>}
+          {rows.map((r, i) => (
+            <tr key={r.team.id} className={i === 0 && r.points > 0 ? 'first' : undefined}>
+              <td className="num">{r.position}</td>
+              <td>{r.team.nameAr}</td>
+              <td className="num">{r.played}</td>
+              {full && <><td className="num">{r.won}</td><td className="num">{r.drawn}</td><td className="num">{r.lost}</td></>}
+              <td className="num">{signed(r.goalDiff)}</td>
+              <td className="num pts">{r.points}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** بطاقة الخبر — .card.news من المعاينة */
+export function NewsCard({ n }: { n: NewsItem }) {
+  return (
+    <article className="card news">
+      <span className="thumb">{n.coverUrl ? <img src={n.coverUrl} alt="" /> : <Mark size={64} />}</span>
+      <span className="body"><b>{n.titleAr}</b><span className="muted">{relativeTime(n.publishedAt)}</span></span>
+    </article>
+  );
+}
+
+export function EmptyCard({ children }: { children: React.ReactNode }) {
+  return <div className="card empty-card">{children}</div>;
+}
