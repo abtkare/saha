@@ -54,6 +54,32 @@ export const RESULT_STATUS_LABELS: Record<ResultStatus, string> = {
   final: 'نهائية',
 };
 
+/**
+ * انتقالات حالة النتيجة (الجلسة 4):
+ * لم تبدأ ← مؤقتة (الحكم يدخلها مع صورة الورقة)
+ * مؤقتة ← مؤقتة (تصحيح الحكم يصفّر التأكيدات) | معتمدة (تأكيد الفريقين) | متنازع عليها (اعتراض) | نهائية (انتهاء المهلة بلا اعتراض)
+ * معتمدة ← نهائية (انتهاء المهلة)
+ * متنازع عليها ← نهائية (قرار اللجنة: رفض أو تصحيح) | لم تبدأ (قرار اللجنة: إعادة المباراة)
+ */
+export const RESULT_TRANSITIONS: Record<ResultStatus, readonly ResultStatus[]> = {
+  scheduled: ['provisional'],
+  provisional: ['provisional', 'confirmed', 'disputed', 'final'],
+  confirmed: ['final'],
+  disputed: ['final', 'scheduled'],
+  final: [],
+};
+
+export const DISPUTE_DECISIONS = ['reject', 'correct', 'replay'] as const;
+export type DisputeDecision = (typeof DISPUTE_DECISIONS)[number];
+export const DISPUTE_DECISION_LABELS: Record<DisputeDecision, string> = {
+  reject: 'رفض الاعتراض وتثبيت النتيجة',
+  correct: 'قبول الاعتراض وتصحيح النتيجة',
+  replay: 'قبول الاعتراض وإعادة المباراة',
+};
+/** لجنة الانضباط ثلاثة أعضاء، والقرار بأغلبية صوتين متطابقين */
+export const DISPUTE_COMMITTEE_SIZE = 3;
+export const DISPUTE_MAJORITY = 2;
+
 export const MATCH_EVENT_TYPES = ['goal', 'own_goal', 'yellow_card', 'red_card', 'mvp'] as const;
 export type MatchEventType = (typeof MATCH_EVENT_TYPES)[number];
 export const MATCH_EVENT_LABELS: Record<MatchEventType, string> = {

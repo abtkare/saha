@@ -435,10 +435,11 @@ saha/
 | الحساب | `GET/PATCH /me` · `POST /me/guardian/children` · `PATCH /me/children/:id/consent` · `DELETE /me` |
 | البطولات | `GET /tournaments` · `GET /tournaments/:id` · `GET /tournaments/:id/standings` (ومعه `groups`) · `GET /tournaments/:id/scorers` · `GET /tournaments/:id/draw` (التحقق من القرعة) · `POST /tournaments` · `PATCH /tournaments/:id` · `POST /tournaments/:id/status` · `GET/POST /tournaments/:id/registrations` · `POST …/registrations/:regId/decision` · `POST …/registrations/:regId/withdraw` · `PATCH …/registrations/:regId/fee` · `POST /tournaments/:id/draw` · `GET /tournaments/:id/fixtures` · `POST /tournaments/:id/schedule` · `POST /tournaments/:id/next-round` |
 | الفرق | `POST /teams` · `GET/PATCH /teams/:id` · `GET /me/teams` · `POST /teams/join` (رمز الانضمام) · `POST /me/children/:id/teams` · `POST /teams/:id/join-code` · `GET/POST /teams/:id/players` · `PATCH/DELETE /teams/:id/players/:playerId` · `GET/POST/PATCH /teams/:id/verification` |
-| المباريات | `GET /matches?date=` · `GET /matches/:id` (ومعه الأحداث) · `PATCH /matches/:id` (الموعد والملعب والحكم) · `POST /matches/:id/result` (الحكم) · `POST /matches/:id/events` · `DELETE /matches/:id/events/:eventId` · `POST /matches/:id/confirm` · `POST /matches/:id/disputes` |
+| المباريات | `GET /matches?date=` · `GET /matches/:id` (ومعه الأحداث وحالة التأكيد ومهلة الاعتراض) · `PATCH /matches/:id` (الموعد والملعب والحكم) · `POST /matches/:id/result` (الحكم، مع `sheetMediaId`) · `GET /matches/:id/sheet` (صورة الورقة لأطراف المباراة فقط) · `POST /matches/:id/events` · `DELETE /matches/:id/events/:eventId` · `POST /matches/:id/confirm` · `POST /matches/:id/disputes` · `GET /me/matches` (مباريات الحكم، ونتائج تنتظر تأكيد فرقي) |
+| الإشعارات | `GET /me/notifications?unread=` · `POST /me/notifications/:id/read` · `POST /me/notifications/read-all` |
 | المحتوى | `GET /home/hero` · `POST /hero/:id/events` · `GET /news` · `GET /pages/:slug` |
-| الملفات | `POST /uploads` (صور فقط، 5MB، تحويل إلى WebP) |
-| الإدارة | `/admin/*` لكل ما سبق + `GET /admin/audit/verify` · `GET /admin/tournaments` · `GET /admin/verifications` · `POST /admin/verifications/:id/decide` · `POST /admin/disputes/:id/decide` |
+| الملفات | `POST /uploads` (multipart بحقل `file`: JPEG/PNG/WebP حتى 5MB، 30 صورة/ساعة؛ التحويل إلى WebP لاحقاً) |
+| الإدارة | `/admin/*` لكل ما سبق + `GET /admin/audit/verify` · `GET /admin/tournaments` · `GET /admin/verifications` · `POST /admin/verifications/:id/decide` · `GET /admin/disputes?status=` · `POST /admin/disputes/:id/vote` |
 
 **قواعد عامة:** كل عملية تغيير تُكتب في `audit_log`، والصلاحيات تُفحص في الخادم حسب مصفوفة الأدوار، والأخطاء تُرجع برسالة عربية ورمز ثابت، وSwagger متاح على `/api/docs` للمديرين فقط.
 
@@ -501,6 +502,16 @@ https://claude.ai/artifact/4yE5e1UHMKrKCDTAk2YCpD
 
 ## سجل التغييرات
 
+- **2026-11-23 — الجلسة 4 (النتائج والاعتراضات) أُنجزت:** migration `0005_results`. **قرارات جديدة:**
+  - **دورة النتيجة** (`RESULT_TRANSITIONS` في `@saha/shared`): لم تبدأ ← مؤقتة (الحكم يدخلها بعد موعد الانطلاق مع صورة الورقة) ← معتمدة (تأكيد مديري الفريقين) ← نهائية (انتهاء النافذة). المؤقتة بلا رد تصبح نهائية مباشرة عند انتهاء النافذة (السكوت قبول). تصحيح الحكم مسموح ما دامت مؤقتة، ويصفّر التأكيدات ويبدأ النافذة من جديد. المعتمدة لا تُعدَّل ولا يُعترض عليها، لكن أحداثها تبقى مفتوحة حتى تصبح نهائية.
+  - **النافذة** `dispute_window_hrs` تبدأ من وقت إدخال النتيجة (`result_entered_at`).
+  - **بدل BullMQ:** مهمة خلفية داخل الخادم تفحص القاعدة كل `RESULT_SWEEP_SECONDS` (60 ثانية). الحالة محفوظة في القاعدة نفسها فلا تضيع بإعادة التشغيل، ولا حزمة جديدة، والتحديث مشروط بالحالة ووقت الإدخال فلا يُنهي تصحيحاً جديداً.
+  - **التأكيد والاعتراض** لمن يملك دور «مدير فريق» مقيّداً بأحد الفريقين فقط — المدير العام لا يؤكد نيابة عن الفرق. من أكّد لا يعترض. الاعتراض خلال النافذة فقط، وسببه 10 أحرف على الأقل، واعتراض واحد مفتوح للمباراة.
+  - **لجنة الانضباط:** كل عضو يصوّت بـ رفض / تصحيح (بنتيجة محددة) / إعادة، ويمكنه تغيير صوته قبل الحسم. القرار بصوتين متطابقين (التصحيح يحتاج النتيجة نفسها). لا يصوّت حكم المباراة ولا مديرا فريقيها ولا المعترض. الرفض والتصحيح ← نهائية؛ الإعادة ← لم تبدأ، وتُمسح النتيجة والأحداث وصورة الورقة، ويحدد مدير البطولة موعداً جديداً.
+  - **ركلات الترجيح** في الأدوار الإقصائية عند التعادل فقط، وإلزامية فيه، ولا تنتهي بالتعادل.
+  - **صورة الورقة** لا تظهر للعامة: للحكم وإدارة البطولة ولجنة الانضباط ومديري الفريقين. الملف يُفحص من بايتاته (لا من اسمه).
+  - **الإشعارات** تُكتب في جدول `notifications` (إدخال النتيجة، تصحيحها، الاعتماد، الاعتراض للطرف الآخر والحكم واللجنة، القرار، النهائية التلقائية). إرسال Expo Push للهاتف مع التطبيق في الجلسة 7.
+  - الأحداث تُقفل أثناء الاعتراض أيضاً (لا عند النهائية فقط).
 - **2026-11-23 — الجلسة 3 (البطولات والفرق) أُنجزت:** إنشاء البطولة وتعديلها وانتقال حالتها (مسودة ← التسجيل ← جارية ← منتهية، أو ملغاة)، التسجيل والاعتماد والانسحاب ورسوم الاشتراك اليدوية، القرعة، الجدولة، الترتيب والمجموعات، الدور الإقصائي التالي، أحداث المباراة والهدافون، الفرق واللاعبون، التوثيق اليدوي. migration `0004_tournaments`. **قرارات جديدة:**
   - **القرعة قابلة للتحقق:** بذرة عشوائية يولدها الخادم وتُحفظ (`tournaments.draw_seed` وسجل التدقيق)، والخلط Fisher–Yates من sha256(البذرة:العدّاد) على أرقام الفرق المعتمدة مرتبة تصاعدياً؛ `GET /tournaments/:id/draw` يعرض ما يلزم لإعادة الحساب. تُعاد القرعة فقط إن لم تُسجَّل أي نتيجة.
   - **الدوري** بطريقة الدائرة (Berger): كل فريق مرة في الجولة، الأرض متوازنة (فرق لا يتجاوز 1)، وخيار ذهاب وإياب. **خروج المغلوب** يحتاج 2/4/8/16/32 فريقاً معتمداً. **المجموعات** حتى 8 (أ…ح) ومتأهل أو اثنان من كل مجموعة، والمجموع قوة للعدد 2؛ التقاطع: أول (أ) ضد ثاني (ب) وأول (ب) ضد ثاني (أ). الدور التالي يُولَّد يدوياً بزر بعد اعتماد نتائج الدور، والتعادل الإقصائي يحتاج ركلات ترجيح (`home_pens`/`away_pens`).

@@ -115,7 +115,8 @@ async function seedDemo(adminId: number | null) {
           homeTeamId: teams[h].id, awayTeamId: teams[a].id, kickoffAt: at(day, 18), venue: 'ساحة الكرادة',
           refereeId: referee.id, homeScore: hs, awayScore: as, resultStatus: status,
           homeConfirmed: status === 'final' || status === 'confirmed', awayConfirmed: status === 'final' || status === 'confirmed',
-          resultEnteredAt: hs === null ? null : at(day, 20), finalizedAt: status === 'final' ? at(day + 1, 20) : null,
+          // النتائج المفتوحة (مؤقتة/معتمدة) تبدأ مهلتها الآن حتى لا تُنهيها المهمة الخلفية فور الإقلاع
+          resultEnteredAt: hs === null ? null : status === 'provisional' || status === 'confirmed' ? new Date() : at(day, 20), finalizedAt: status === 'final' ? at(day + 1, 20) : null,
         },
       });
       if (day === 0 && !todayMatchId) todayMatchId = m.id;

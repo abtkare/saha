@@ -7,6 +7,7 @@ const DEFAULT_MESSAGES: Record<number, { code: string; message: string }> = {
   401: { code: 'UNAUTHORIZED', message: 'سجّل الدخول أولاً.' },
   403: { code: 'FORBIDDEN', message: 'لا تملك صلاحية لهذا الإجراء.' },
   404: { code: 'NOT_FOUND', message: 'العنصر المطلوب غير موجود.' },
+  413: { code: 'FILE_TOO_LARGE', message: 'حجم الملف أكبر من المسموح (5 ميغابايت).' },
   429: { code: 'TOO_MANY_REQUESTS', message: 'محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة.' },
   500: { code: 'SERVER_ERROR', message: 'حدث خطأ في الخادم. حاول مرة أخرى بعد قليل.' },
 };

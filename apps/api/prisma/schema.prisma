@@ -431,6 +431,8 @@ model Match {
   /// نتيجة نصية مباشرة يحدّثها الحكم (شريحة «مباراة اليوم»)
   liveText       String?      @map("live_text")
   sheetPhotoUrl  String?      @map("sheet_photo_url")
+  /// صورة ورقة المباراة المرفوعة (لا تُعرض للعامة)
+  sheetMediaId   Int?         @map("sheet_media_id")
   homeConfirmed  Boolean      @default(false) @map("home_confirmed")
   awayConfirmed  Boolean      @default(false) @map("away_confirmed")
   resultEnteredAt DateTime?   @map("result_entered_at") @db.Timestamptz(3)
@@ -441,6 +443,7 @@ model Match {
   homeTeam   Team         @relation("HomeTeam", fields: [homeTeamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   awayTeam   Team         @relation("AwayTeam", fields: [awayTeamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
   referee    User?        @relation(fields: [refereeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sheetMedia MediaAsset?  @relation(fields: [sheetMediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   events     MatchEvent[]
   disputes   Dispute[]
   heroSlides HeroSlide[]
@@ -448,6 +451,7 @@ model Match {
   @@index([tournamentId])
   @@index([kickoffAt])
   @@index([refereeId])
+  @@index([resultStatus, resultEnteredAt])
   @@map("matches")
 }
 
@@ -479,6 +483,8 @@ model Dispute {
   teamId       Int?          @map("team_id")
   reason       String
   status       DisputeStatus @default(open)
+  /// قرار اللجنة: reject | correct | replay
+  decision     String?
   decisionNote String?       @map("decision_note")
   decidedAt    DateTime?     @map("decided_at") @db.Timestamptz(3)
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -497,6 +503,12 @@ model DisputeVote {
   disputeId Int      @map("dispute_id")
   memberId  Int      @map("member_id")
   uphold    Boolean
+  /// reject | correct | replay — والنتيجة المقترحة عند correct
+  decision  String
+  homeScore Int?     @map("home_score")
+  awayScore Int?     @map("away_score")
+  homePens  Int?     @map("home_pens")
+  awayPens  Int?     @map("away_pens")
   note      String?
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
@@ -601,8 +613,10 @@ model MediaAsset {
   uploadedById Int?     @map("uploaded_by_id")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  uploadedBy User? @relation(fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  uploadedBy User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sheetFor   Match[]
 
+  @@index([uploadedById, createdAt])
   @@map("media_assets")
 }
 
