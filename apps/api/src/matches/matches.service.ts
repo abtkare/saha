@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TIMEZONE } from '@saha/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/arabic-error.filter';
+import { PUBLIC_PLAYER_SELECT, publicPlayerName } from '../teams/players';
 
 const BAGHDAD_OFFSET = '+03:00'; // العراق بلا توقيت صيفي
 
@@ -36,13 +37,20 @@ export class MatchesService {
     });
   }
 
+  /** تفاصيل المباراة مع أحداثها (القاصر بالاسم الأول فقط) */
   async get(id: string) {
     if (!/^\d+$/.test(id)) throw new AppError(404, 'MATCH_NOT_FOUND', 'المباراة غير موجودة.');
     const m = await this.prisma.match.findFirst({
       where: { id: Number(id), tournament: { status: { not: 'draft' } } },
-      select: MATCH_SELECT,
+      select: {
+        ...MATCH_SELECT, homePens: true, awayPens: true,
+        events: { orderBy: [{ minute: 'asc' }, { id: 'asc' }], select: { id: true, type: true, minute: true, teamId: true, player: { select: PUBLIC_PLAYER_SELECT } } },
+      },
     });
     if (!m) throw new AppError(404, 'MATCH_NOT_FOUND', 'المباراة غير موجودة.');
-    return m;
+    return {
+      ...m,
+      events: m.events.map((e) => ({ id: e.id, type: e.type, minute: e.minute, teamId: e.teamId, player: e.player ? { id: e.player.id, name: publicPlayerName(e.player) } : null })),
+    };
   }
 }

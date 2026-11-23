@@ -4,14 +4,25 @@ import { AuditModule } from './audit/audit.module';
 import { HealthController } from './health/health.controller';
 import { TournamentsController } from './tournaments/tournaments.controller';
 import { TournamentsService } from './tournaments/tournaments.service';
+import { TournamentManageController } from './tournaments/manage.controller';
+import { TournamentManageService } from './tournaments/manage.service';
 import { MatchesController } from './matches/matches.controller';
 import { MatchesService } from './matches/matches.service';
+import { MatchManageController, MatchManageService } from './matches/match-manage';
+import { TeamsController, TeamsPublicController } from './teams/teams.controller';
+import { TeamsService } from './teams/teams.service';
 import { NewsController } from './news/news.controller';
 import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [PrismaModule, AuditModule, AuthModule],
-  controllers: [HealthController, TournamentsController, MatchesController, NewsController],
-  providers: [TournamentsService, MatchesService],
+  controllers: [
+    HealthController,
+    TournamentsController, TournamentManageController,
+    MatchesController, MatchManageController,
+    TeamsPublicController, TeamsController,
+    NewsController,
+  ],
+  providers: [TournamentsService, TournamentManageService, MatchesService, MatchManageService, TeamsService],
 })
 export class AppModule {}

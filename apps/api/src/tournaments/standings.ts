@@ -17,6 +17,9 @@ export interface StandingRow {
 
 export const COUNTED_STATUSES = ['confirmed', 'final'] as const;
 
+/** مباريات تدخل جدول الترتيب: الدوري ودور المجموعات (لا الأدوار الإقصائية) */
+export const isGroupStage = (stage: string | null) => stage === null || stage === 'league' || stage === 'group';
+
 export function computeStandings(teams: StandingTeam[], matches: StandingMatch[]): StandingRow[] {
   const rows = new Map<number, Omit<StandingRow, 'position'>>();
   for (const team of teams) {

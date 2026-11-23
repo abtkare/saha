@@ -16,6 +16,16 @@ export class TournamentsController {
     return this.tournaments.standings(id);
   }
 
+  @Get(':id/scorers')
+  scorers(@Param('id') id: string) {
+    return this.tournaments.scorers(id);
+  }
+
+  @Get(':id/draw')
+  drawInfo(@Param('id') id: string) {
+    return this.tournaments.drawInfo(id);
+  }
+
   @Get(':id')
   get(@Param('id') id: string) {
     return this.tournaments.get(id);

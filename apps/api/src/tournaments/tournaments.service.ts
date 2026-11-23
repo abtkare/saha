@@ -3,7 +3,9 @@ import { TournamentKind } from '@prisma/client';
 import { TOURNAMENT_KINDS } from '@saha/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/arabic-error.filter';
-import { computeStandings } from './standings';
+import { computeStandings, COUNTED_STATUSES, isGroupStage } from './standings';
+import { GROUP_LABELS } from './fixtures';
+import { PUBLIC_PLAYER_SELECT, publicPlayerName } from '../teams/players';
 
 @Injectable()
 export class TournamentsService {
@@ -38,21 +40,69 @@ export class TournamentsService {
     });
   }
 
-  /** GET /tournaments/:id/standings — فرق البطولة المعتمدة مع نقاطها */
+  /**
+   * GET /tournaments/:id/standings — ترتيب الدوري أو المجموعات (مباريات الأدوار الإقصائية لا تدخل).
+   * rows: الترتيب العام، groups: ترتيب كل مجموعة (لنظام المجموعات).
+   */
   async standings(idOrSlug: string) {
     const where = /^\d+$/.test(idOrSlug) ? { id: Number(idOrSlug) } : { slug: idOrSlug };
     const t = await this.prisma.tournament.findFirst({
       where: { ...where, status: { not: 'draft' } },
       select: {
-        id: true, nameAr: true, slug: true,
-        registrations: { where: { status: 'approved' }, select: { team: { select: { id: true, nameAr: true } } } },
-        matches: { select: { homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true, resultStatus: true } },
+        id: true, nameAr: true, slug: true, format: true,
+        registrations: { where: { status: 'approved' }, select: { groupLabel: true, team: { select: { id: true, nameAr: true } } } },
+        matches: { select: { stage: true, homeTeamId: true, awayTeamId: true, homeScore: true, awayScore: true, resultStatus: true } },
       },
     });
     if (!t) throw new AppError(404, 'TOURNAMENT_NOT_FOUND', 'البطولة غير موجودة.');
+    const matches = t.matches.filter((m) => isGroupStage(m.stage));
+    const groups = GROUP_LABELS
+      .map((label) => ({ label, teams: t.registrations.filter((r) => r.groupLabel === label).map((r) => r.team) }))
+      .filter((g) => g.teams.length)
+      .map((g) => ({ label: g.label, rows: computeStandings(g.teams, matches.filter((m) => g.teams.some((x) => x.id === m.homeTeamId))) }));
     return {
-      tournament: { id: t.id, nameAr: t.nameAr, slug: t.slug },
-      rows: computeStandings(t.registrations.map((r) => r.team), t.matches),
+      tournament: { id: t.id, nameAr: t.nameAr, slug: t.slug, format: t.format },
+      rows: computeStandings(t.registrations.map((r) => r.team), matches),
+      groups,
+    };
+  }
+
+  /** GET /tournaments/:id/scorers — الهدافون من أحداث المباريات المعتمدة والنهائية */
+  async scorers(idOrSlug: string) {
+    const where = /^\d+$/.test(idOrSlug) ? { id: Number(idOrSlug) } : { slug: idOrSlug };
+    const t = await this.prisma.tournament.findFirst({ where: { ...where, status: { not: 'draft' } }, select: { id: true } });
+    if (!t) throw new AppError(404, 'TOURNAMENT_NOT_FOUND', 'البطولة غير موجودة.');
+    const goals = await this.prisma.matchEvent.groupBy({
+      by: ['playerId', 'teamId'],
+      where: { type: 'goal', playerId: { not: null }, match: { tournamentId: t.id, resultStatus: { in: [...COUNTED_STATUSES] } } },
+      _count: { _all: true },
+    });
+    const players = await this.prisma.player.findMany({ where: { id: { in: goals.map((g) => g.playerId!) } }, select: PUBLIC_PLAYER_SELECT });
+    const teams = await this.prisma.team.findMany({ where: { id: { in: goals.map((g) => g.teamId) } }, select: { id: true, nameAr: true } });
+    return goals
+      .map((g) => {
+        const p = players.find((x) => x.id === g.playerId)!;
+        return { player: { id: p.id, name: publicPlayerName(p) }, team: teams.find((x) => x.id === g.teamId)!, goals: g._count._all };
+      })
+      .sort((a, b) => b.goals - a.goals || a.player.name.localeCompare(b.player.name, 'ar'))
+      .slice(0, 20);
+  }
+
+  /** GET /tournaments/:id/draw — بيانات التحقق من القرعة: البذرة والفرق بترتيبها قبل الخلط */
+  async drawInfo(idOrSlug: string) {
+    const where = /^\d+$/.test(idOrSlug) ? { id: Number(idOrSlug) } : { slug: idOrSlug };
+    const t = await this.prisma.tournament.findFirst({ where: { ...where, status: { not: 'draft' } }, select: { id: true, drawSeed: true, drawnAt: true, format: true, groupCount: true } });
+    if (!t) throw new AppError(404, 'TOURNAMENT_NOT_FOUND', 'البطولة غير موجودة.');
+    if (!t.drawnAt) return { drawn: false };
+    const entry = await this.prisma.auditLog.findFirst({
+      where: { entity: 'tournament', entityId: String(t.id), action: { in: ['tournament.draw', 'tournament.redraw'] } },
+      orderBy: { seq: 'desc' }, select: { payload: true, seq: true, hash: true },
+    });
+    return {
+      drawn: true, drawnAt: t.drawnAt, seed: t.drawSeed, format: t.format, groupCount: t.groupCount,
+      teamIdsBeforeDraw: (entry?.payload as unknown as { teamIds?: number[] } | null)?.teamIds ?? null,
+      auditSeq: entry ? Number(entry.seq) : null, auditHash: entry?.hash ?? null,
+      method: 'خلط Fisher–Yates لأرقام الفرق المعتمدة مرتبة تصاعدياً، والأرقام العشوائية من sha256(البذرة:العدّاد).',
     };
   }
 

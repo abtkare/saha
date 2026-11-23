@@ -97,15 +97,4 @@ export class ScopedController {
       select: { shirtNo: true, player: { select: { id: true, firstName: true, lastName: true, birthYear: true, mediaConsent: true } } },
     });
   }
-
-  /** GET /tournaments/:id/registrations — طلبات التسجيل لمدير البطولة */
-  @Get('tournaments/:id/registrations')
-  async registrations(@Param('id') id: string, @Req() req: AuthedRequest) {
-    const tournamentId = idParam(id, 'البطولة');
-    assertCan(req.auth, 'tournaments.manage', { tournamentId });
-    return this.prisma.tournamentRegistration.findMany({
-      where: { tournamentId },
-      select: { id: true, status: true, feePaidIqd: true, createdAt: true, team: { select: { id: true, nameAr: true } } },
-    });
-  }
 }

@@ -278,6 +278,15 @@ model Tournament {
   disputeWindowHrs Int              @default(24) @map("dispute_window_hrs")
   entryFeeIqd      Int              @default(0) @map("entry_fee_iqd")
   maxTeams         Int?             @map("max_teams")
+  /// عدد المجموعات (لنظام المجموعات ثم خروج المغلوب)
+  groupCount         Int?           @map("group_count")
+  /// المتأهلون من كل مجموعة (1 أو 2)
+  qualifiersPerGroup Int?           @map("qualifiers_per_group")
+  /// الدوري من دورين (ذهاب وإياب)
+  doubleRound      Boolean          @default(false) @map("double_round")
+  /// بذرة القرعة — تُحفظ ليُعاد حساب القرعة نفسها والتحقق منها
+  drawSeed         String?          @map("draw_seed")
+  drawnAt          DateTime?        @map("drawn_at") @db.Timestamptz(3)
   status           TournamentStatus @default(draft)
   createdById      Int?             @map("created_by_id")
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -306,6 +315,8 @@ model Team {
   fbPageId     String?       @map("fb_page_id")
   verifiedAt   DateTime?     @map("verified_at") @db.Timestamptz(3)
   verifyMethod VerifyMethod? @map("verify_method")
+  /// رمز انضمام اللاعبين (يشاركه مدير الفريق)
+  joinCode     String?       @unique @map("join_code")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
 
   manager              User                      @relation(fields: [managerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -332,6 +343,8 @@ model TeamVerificationRequest {
   code         String
   postUrl      String?       @map("post_url")
   status       RequestStatus @default(pending)
+  /// ملاحظة قرار المراجعة
+  note         String?
   reviewedById Int?          @map("reviewed_by_id")
   reviewedAt   DateTime?     @map("reviewed_at") @db.Timestamptz(3)
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -411,6 +424,9 @@ model Match {
   refereeId      Int?         @map("referee_id")
   homeScore      Int?         @map("home_score")
   awayScore      Int?         @map("away_score")
+  /// ركلات الترجيح (خروج المغلوب فقط)
+  homePens       Int?         @map("home_pens")
+  awayPens       Int?         @map("away_pens")
   resultStatus   ResultStatus @default(scheduled) @map("result_status")
   /// نتيجة نصية مباشرة يحدّثها الحكم (شريحة «مباراة اليوم»)
   liveText       String?      @map("live_text")
