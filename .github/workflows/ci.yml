@@ -133,7 +133,12 @@ jobs:
           (cd apps/preview/public && python3 -m http.server 8099 >/dev/null 2>&1 &)
           sleep 2
           shot() { google-chrome --headless=new --no-sandbox --hide-scrollbars --force-device-scale-factor=1 \
-            --virtual-time-budget=7000 --window-size="$3" --screenshot="shots/$1.png" "$2" 2>/dev/null; }
+            --virtual-time-budget="${4:-15000}" --window-size="$3" --screenshot="shots/$1.png" "$2" 2>/dev/null; }
+          # إطاران من شاشة البداية (الكرة ترتد، ثم الكلمة والشارات)
+          shot 0-preview-splash-a http://localhost:8099/ 390,844 1900
+          shot 0-web-splash-a http://localhost:8098/ 390,844 1900
+          shot 0-preview-splash-b http://localhost:8099/ 390,844 3300
+          shot 0-web-splash-b http://localhost:8098/ 390,844 3300
           shot 1-preview-desktop http://localhost:8099/ 1440,3100
           shot 1-web-desktop http://localhost:8098/ 1440,3100
           shot 2-preview-mobile http://localhost:8099/ 390,5200
