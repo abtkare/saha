@@ -433,12 +433,12 @@ saha/
 | --- | --- |
 | الدخول | `POST /auth/otp/request` · `POST /auth/otp/verify` · `POST /auth/refresh` · `POST /auth/admin/login` (بريد + كلمة سر + TOTP) |
 | الحساب | `GET/PATCH /me` · `POST /me/guardian/children` · `PATCH /me/children/:id/consent` · `DELETE /me` |
-| البطولات | `GET /tournaments` · `GET /tournaments/:id` · `GET /tournaments/:id/standings` · `POST /tournaments/:id/registrations` |
-| الفرق | `POST /teams` · `GET/PATCH /teams/:id` · `POST /teams/:id/players` · `POST /teams/:id/verification` |
-| المباريات | `GET /matches?date=` · `GET /matches/:id` · `POST /matches/:id/result` (الحكم) · `POST /matches/:id/events` · `POST /matches/:id/confirm` · `POST /matches/:id/disputes` |
+| البطولات | `GET /tournaments` · `GET /tournaments/:id` · `GET /tournaments/:id/standings` (ومعه `groups`) · `GET /tournaments/:id/scorers` · `GET /tournaments/:id/draw` (التحقق من القرعة) · `POST /tournaments` · `PATCH /tournaments/:id` · `POST /tournaments/:id/status` · `GET/POST /tournaments/:id/registrations` · `POST …/registrations/:regId/decision` · `POST …/registrations/:regId/withdraw` · `PATCH …/registrations/:regId/fee` · `POST /tournaments/:id/draw` · `GET /tournaments/:id/fixtures` · `POST /tournaments/:id/schedule` · `POST /tournaments/:id/next-round` |
+| الفرق | `POST /teams` · `GET/PATCH /teams/:id` · `GET /me/teams` · `POST /teams/join` (رمز الانضمام) · `POST /me/children/:id/teams` · `POST /teams/:id/join-code` · `GET/POST /teams/:id/players` · `PATCH/DELETE /teams/:id/players/:playerId` · `GET/POST/PATCH /teams/:id/verification` |
+| المباريات | `GET /matches?date=` · `GET /matches/:id` (ومعه الأحداث) · `PATCH /matches/:id` (الموعد والملعب والحكم) · `POST /matches/:id/result` (الحكم) · `POST /matches/:id/events` · `DELETE /matches/:id/events/:eventId` · `POST /matches/:id/confirm` · `POST /matches/:id/disputes` |
 | المحتوى | `GET /home/hero` · `POST /hero/:id/events` · `GET /news` · `GET /pages/:slug` |
 | الملفات | `POST /uploads` (صور فقط، 5MB، تحويل إلى WebP) |
-| الإدارة | `/admin/*` لكل ما سبق + `GET /admin/audit/verify` · `POST /admin/disputes/:id/decide` |
+| الإدارة | `/admin/*` لكل ما سبق + `GET /admin/audit/verify` · `GET /admin/tournaments` · `GET /admin/verifications` · `POST /admin/verifications/:id/decide` · `POST /admin/disputes/:id/decide` |
 
 **قواعد عامة:** كل عملية تغيير تُكتب في `audit_log`، والصلاحيات تُفحص في الخادم حسب مصفوفة الأدوار، والأخطاء تُرجع برسالة عربية ورمز ثابت، وSwagger متاح على `/api/docs` للمديرين فقط.
 
@@ -501,6 +501,16 @@ https://claude.ai/artifact/4yE5e1UHMKrKCDTAk2YCpD
 
 ## سجل التغييرات
 
+- **2026-11-23 — الجلسة 3 (البطولات والفرق) أُنجزت:** إنشاء البطولة وتعديلها وانتقال حالتها (مسودة ← التسجيل ← جارية ← منتهية، أو ملغاة)، التسجيل والاعتماد والانسحاب ورسوم الاشتراك اليدوية، القرعة، الجدولة، الترتيب والمجموعات، الدور الإقصائي التالي، أحداث المباراة والهدافون، الفرق واللاعبون، التوثيق اليدوي. migration `0004_tournaments`. **قرارات جديدة:**
+  - **القرعة قابلة للتحقق:** بذرة عشوائية يولدها الخادم وتُحفظ (`tournaments.draw_seed` وسجل التدقيق)، والخلط Fisher–Yates من sha256(البذرة:العدّاد) على أرقام الفرق المعتمدة مرتبة تصاعدياً؛ `GET /tournaments/:id/draw` يعرض ما يلزم لإعادة الحساب. تُعاد القرعة فقط إن لم تُسجَّل أي نتيجة.
+  - **الدوري** بطريقة الدائرة (Berger): كل فريق مرة في الجولة، الأرض متوازنة (فرق لا يتجاوز 1)، وخيار ذهاب وإياب. **خروج المغلوب** يحتاج 2/4/8/16/32 فريقاً معتمداً. **المجموعات** حتى 8 (أ…ح) ومتأهل أو اثنان من كل مجموعة، والمجموع قوة للعدد 2؛ التقاطع: أول (أ) ضد ثاني (ب) وأول (ب) ضد ثاني (أ). الدور التالي يُولَّد يدوياً بزر بعد اعتماد نتائج الدور، والتعادل الإقصائي يحتاج ركلات ترجيح (`home_pens`/`away_pens`).
+  - **الجدولة:** تاريخ البداية + أيام اللعب + أوقات الانطلاق + الملاعب (+ أيام راحة)، كل جولة تبدأ يوماً جديداً، ولا يلعب فريق مرتين في اليوم، بتوقيت بغداد. يمكن جدولة دور جديد وحده (`fromRound`) وتعديل مباراة واحدة (`PATCH /matches/:id`).
+  - **الترتيب** يحسب الدوري ودور المجموعات فقط، من النتائج المعتمدة والنهائية.
+  - **انضمام اللاعبين برمز الفريق** (6 أحرف، `teams.join_code`): البالغ ينضم بنفسه أو يضيفه المدير برقمه، والقاصر يضمّه ولي أمره من حسابه (موافقته ضمنية). الحد 30 لاعباً للفريق و5 فرق للمدير. القاصر يظهر للعامة باسمه الأول فقط.
+  - **الأهلية** تُفحص عند اعتماد التسجيل وعند إضافة لاعب لفريق معتمد: الفئة العمرية، ولا يلعب لاعب لفريقين في البطولة نفسها.
+  - **أحداث المباراة** يسجلها حكمها المعيَّن أو مدير البطولة. الهدف العكسي: `teamId` للفريق المستفيد واللاعب من المنافس. «أفضل لاعب» مرة واحدة. النتيجة النهائية تقفل الأحداث.
+  - **التوثيق اليدوي:** رمز `SAHA-XXXXXX` ينشره المدير على صفحة الفريق ثم يرسل رابط المنشور، ويعتمده مدير بطولات عام أو المدير العام. تغيير رابط الصفحة يلغي التوثيق.
+  - البطولة الشعبية لا تُربط بمجتمع، وبطولة المؤثر/المجموعة تقبل فرق مجتمعها فقط.
 - **2026-11-23 — الجلسة 2 (الدخول والأدوار) أُنجزت:** OTP بمزوّد قابل للتبديل وRate Limit على Redis، جلسات بتدوير رمز التجديد، ولي الأمر وموافقة الصور، دخول الإدارة بـ TOTP (بلا حزم خارجية — node:crypto)، مصفوفة الصلاحيات في `@saha/shared` بنطاق بطولة/فريق. **قرار جديد:** أدوار المدير العام ومحرر المحتوى ومدير الرعاة لا تعمل صلاحياتها إلا بدخول TOTP، حتى لو كان للحساب رقم هاتف. Swagger للمدير العام فقط.
 - **2026-11-23 — الالتزام بالتصميم الأصلي:** موقع `apps/web` صار نقلاً حرفياً لنسخة المعاينة (`saha.css` = `styles.css`)، والمقارنة البصرية تلقائية في CI (الفرع `ci-shots`). الوضع الداكن لا يتفعّل تلقائياً حتى يُصمَّم في الجلسة 6. نص حالة «لم تُلعب» صار «لم تبدأ» كما في التصميم.
 
