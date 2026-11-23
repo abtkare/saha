@@ -142,9 +142,14 @@ jobs:
           shot 4-web-tournament-mobile http://localhost:8098/tournaments/baghdad-sahat-2026 390,4400
           ls -la shots
 
-      - name: رفع اللقطات
-        uses: actions/upload-artifact@v4
-        with: { name: visual-compare, path: shots, retention-days: 14 }
+      - name: حفظ اللقطات في الفرع ci-shots (للمقارنة من جلسة البرمجة)
+        if: github.event_name != 'pull_request'
+        run: |
+          cd shots
+          git init -q -b ci-shots
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "لقطات ${{ github.sha }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" ci-shots
 
       - name: السجلات عند الفشل
         if: failure()
