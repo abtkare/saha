@@ -75,6 +75,7 @@
 - **الملفات:** `tournaments/manage.service.ts` و`manage.controller.ts` (الإدارة)، `teams/` (الفرق واللاعبون والتوثيق والأهلية)، `matches/match-manage.ts` (تعديل المباراة والأحداث)، `tournaments.service.ts` (الترتيب بالمجموعات، الهدافون، التحقق من القرعة). الثوابت الجديدة في `@saha/shared`: `MATCH_EVENT_TYPES` و`STAGE_LABELS` و`ageEligible`.
 - **القاعدة:** `migrations/0004_tournaments` — `group_count`، `qualifiers_per_group`، `double_round`، `draw_seed`، `drawn_at`، `teams.join_code`، `home_pens`/`away_pens`، `team_verification_requests.note` + قيود CHECK. تُطبَّق تلقائياً عند إقلاع الحاوية (`prisma migrate deploy`).
 - **الواجهات:** القائمة الكاملة في `docs/PLAN.md` ← «واجهات API»، والقرارات في «سجل التغييرات».
+- **لقطات ci-shots (80d6912):** لقطة الموقع مطابقة للتصميم. لقطة المعاينة على الحاسوب التقطت شاشة البداية قبل اختفائها (توقيت الالتقاط في CI، لا تغيير في التصميم) — إن تكرر فزِد `virtual-time-budget` للمعاينة في `ci.yml`.
 - **الموقع لم يتغير** في هذه الجلسة (صفحات الفريق والهدافين ولوحة الإدارة في الجلسة 6، وتبنى من مكونات `apps/preview`).
 - **طريقة العمل:** فرع + Pull Request ← CI ← دمج في `main` (يبني الصور). المنطق الخالص يُجرَّب محلياً بـ `node --experimental-strip-types`، وPostgreSQL المحلي لتجربة الـ migrations.
 
