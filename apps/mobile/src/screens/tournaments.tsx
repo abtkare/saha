@@ -14,6 +14,7 @@ import { kickoffDay, shortDate } from '../format';
 import { errMsg, useLoad } from '../hooks';
 import { useNav } from '../nav';
 import { row, T, useTheme } from '../theme';
+import { ChipPicker } from './match';
 import type { MatchItem, Scorer, Standings, TournamentDetail, TournamentSummary } from '../types';
 
 type KindFilter = 'all' | TournamentKind;
@@ -28,7 +29,7 @@ export function TournamentsScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <TabHeader title="البطولات" subtitle="كل جمهور يستحق بطولته" />
-      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}><Tabs items={KIND_TABS} value={kind} onChange={setKind} scroll /></View>
+      <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}><ChipPicker items={KIND_TABS} value={kind} onChange={setKind} /></View>
       <ScrollPage onRefresh={list.refresh} refreshing={list.refreshing}>
         <View style={{ padding: 16, gap: 12 }}>
           {list.loading && !list.data ? <Loading /> : list.error ? <ErrorBox message={list.error} onRetry={list.refresh} /> :
