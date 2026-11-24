@@ -84,7 +84,8 @@ jobs:
       - name: تشغيل الخادم والموقع
         run: |
           (cd apps/api && PORT=3001 nohup node dist/src/main.js > /tmp/api.log 2>&1 &)
-          (cd apps/web/.next/standalone && PORT=8098 HOSTNAME=0.0.0.0 API_INTERNAL_URL=http://127.0.0.1:3001 EXPO_CI_MODE=true nohup node apps/web/server.js > /tmp/web.log 2>&1 &)
+          (cd apps/web/.next/standalone && PORT=8097 HOSTNAME=0.0.0.0 API_INTERNAL_URL=http://127.0.0.1:3001 EXPO_CI_MODE=true nohup node apps/web/server.js > /tmp/web.log 2>&1 &)
+          nohup node .github/scripts/log-proxy.mjs 8098 8097 > /tmp/proxy.log 2>&1 &
           for i in $(seq 1 60); do curl -sf 127.0.0.1:8098/api/v1/health && break; sleep 1; done
           curl -sf -H 'expo-platform: ios' -H 'accept: application/json' 127.0.0.1:8098/expo | head -c 800; echo
 
@@ -113,6 +114,7 @@ jobs:
         run: |
           tail -40 /tmp/api.log || true
           tail -40 /tmp/web.log || true
+          echo "=== طلبات Expo Go"; grep -v "/api/v1/" /tmp/proxy.log | head -80 || true
           xcrun simctl io "$UDID" screenshot --type=png app-shots/zz-final.png || true
           ls -la app-shots || true
 

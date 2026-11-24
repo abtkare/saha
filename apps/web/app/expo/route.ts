@@ -20,9 +20,8 @@ export async function GET(req: NextRequest) {
   if (!accept.includes('multipart/mixed')) {
     return new NextResponse(JSON.stringify(manifest), { headers: { ...headers, 'content-type': 'application/json; charset=utf-8' } });
   }
-  const boundary = `saha-${createHash('md5').update(manifest.id).digest('hex').slice(0, 16)}`;
-  const part = (name: string, body: string) =>
-    `--${boundary}\r\ncontent-type: application/json; charset=utf-8\r\ncontent-disposition: form-data; name="${name}"\r\n\r\n${body}\r\n`;
-  const body = part('manifest', JSON.stringify(manifest)) + part('extensions', JSON.stringify({ assetRequestHeaders: {} })) + `--${boundary}--\r\n`;
+  // نفس صيغة خادم Expo الرسمي حرفياً (Expo Go يقرأ هذا الشكل)
+  const boundary = `----formdata-${createHash('md5').update(manifest.id).digest('hex').slice(0, 10)}`;
+  const body = `--${boundary}\r\nContent-Disposition: form-data; name="manifest"; filename="manifest"\r\nContent-Type: application/json\r\n\r\n${JSON.stringify(manifest)}\r\n--${boundary}--\r\n`;
   return new NextResponse(body, { headers: { ...headers, 'content-type': `multipart/mixed; boundary=${boundary}` } });
 }
