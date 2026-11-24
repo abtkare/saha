@@ -1,11 +1,11 @@
 /** مكونات أساسية بنفس قيم saha.css: البطاقة، الشارة، الأزرار، الحقول، التبويبات، الأقسام */
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator, Pressable, RefreshControl, ScrollView, TextInput, View,
   type StyleProp, type TextInputProps, type ViewStyle,
 } from 'react-native';
 import { RESULT_STATUS_LABELS, type ResultStatus } from '@saha/shared';
-import { ff, radius, right, row, start, T, useTheme } from '../theme';
+import { ff, isRTL, radius, right, row, start, T, useTheme } from '../theme';
 import { Icon, type IconName } from './icons';
 
 export function Card({ children, style, onPress, flush }: { children: ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; flush?: boolean }) {
@@ -127,6 +127,8 @@ export function Field({ label, hint, error, style, ...rest }: TextInputProps & {
 /** تبويبات على شكل حبة (.tabs) */
 export function Tabs<K extends string>({ items, value, onChange, scroll }: { items: { key: K; label: string }[]; value: K; onChange: (k: K) => void; scroll?: boolean }) {
   const { c } = useTheme();
+  // القائمة الأفقية تبدأ من اليمين (أول تبويب) في الواجهة العربية
+  const scrollRef = useRef<ScrollView>(null);
   const body = items.map((it) => {
     const on = it.key === value;
     return (
@@ -141,7 +143,8 @@ export function Tabs<K extends string>({ items, value, onChange, scroll }: { ite
   const box: ViewStyle = { flexDirection: row, gap: 6, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: radius.pill, padding: 4 };
   if (!scroll) return <View style={box} accessibilityRole="tablist">{body}</View>;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+    <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+      onContentSizeChange={() => { if (!isRTL) scrollRef.current?.scrollToEnd({ animated: false }); }}>
       <View style={box} accessibilityRole="tablist">{body}</View>
     </ScrollView>
   );

@@ -1,12 +1,12 @@
 /** بطاقات «ساحة» في التطبيق — نفس تصميم «رئيسية التطبيق»: المباراة، البطولة، الترتيب، الخبر، والهيرو سلايدر */
-import { useEffect, useRef, useState } from 'react';
-import { FlatList, Image, Linking, Pressable, View, useWindowDimensions, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image, Linking, PanResponder, Pressable, View, useWindowDimensions } from 'react-native';
 import { RESULT_STATUS_LABELS, TOURNAMENT_FORMAT_LABELS, TOURNAMENT_KIND_LABELS, TOURNAMENT_STATUS_LABELS } from '@saha/shared';
 import { api, deviceId } from '../api';
 import { WEB_URL } from '../config';
 import { useInterval } from '../hooks';
 import { useNav } from '../nav';
-import { invertHorizontal, radius, row, T, useTheme } from '../theme';
+import { radius, row, T, useTheme } from '../theme';
 import { kickoffDay, kickoffTime, relativeTime, scoreText, shortDate, signed } from '../format';
 import type { Hero, HeroSlide, MatchItem, NewsItem, StandingRow, TournamentSummary } from '../types';
 import { Icon, Mark, PitchLines } from './icons';
@@ -156,55 +156,60 @@ export function HeroSlider({ hero, onRefresh }: { hero: Hero | null; onRefresh: 
   const { width } = useWindowDimensions();
   const w = width - 32;
   const h = Math.round(w * 0.5625);
-  const list = useRef<FlatList<HeroSlide>>(null);
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
+  const fade = useRef(new Animated.Value(1)).current;
   const seen = useRef(new Set<number>());
   const slides = hero?.slides ?? [];
   const n = slides.length;
+  const cur = n ? Math.min(i, n - 1) : 0;
+
+  const go = (d: number) => {
+    if (n < 2) return;
+    fade.setValue(0.25);
+    setI((x) => (Math.min(x, n - 1) + d + n) % n);
+    Animated.timing(fade, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+  };
+  const goRef = useRef(go);
+  goRef.current = go;
 
   useInterval(onRefresh, (hero?.refreshSeconds ?? 30) * 1000);
-  useInterval(() => {
-    if (n < 2 || paused) return;
-    const next = (i + 1) % n;
-    list.current?.scrollToIndex({ index: next, animated: true });
-    setI(next);
-  }, n > 1 ? AUTO_MS : null);
+  useInterval(() => { if (!paused) goRef.current(1); }, n > 1 ? AUTO_MS : null);
 
   useEffect(() => {
-    const s = slides[Math.min(i, n - 1)];
+    const s = slides[cur];
     if (!s || seen.current.has(s.id)) return;
     seen.current.add(s.id);
     void track(s.id, 'impression');
-  }, [i, slides, n]);
+  }, [cur, slides]);
+
+  // السحب: لليمين ← التالية (الاتجاه العربي كما في الموقع)
+  const pan = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 14 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+    onPanResponderRelease: (_, g) => { setPaused(true); if (Math.abs(g.dx) > 40) goRef.current(g.dx > 0 ? 1 : -1); },
+  }), []);
 
   if (!n) return null;
-  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const k = Math.round(e.nativeEvent.contentOffset.x / w);
-    if (k !== i && k >= 0 && k < n) setI(k);
-  };
-
+  const s = slides[cur];
   return (
-    <View style={{ gap: 0 }}>
-      <View style={{ height: h, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#0B6E4F' }}>
-        <FlatList
-          ref={list} data={slides} keyExtractor={(s) => String(s.id)} horizontal pagingEnabled inverted={invertHorizontal}
-          showsHorizontalScrollIndicator={false} onMomentumScrollEnd={onScroll} onScrollBeginDrag={() => setPaused(true)}
-          getItemLayout={(_, index) => ({ length: w, offset: w * index, index })}
-          renderItem={({ item }) => <Slide s={item} w={w} h={h} />}
-        />
-        {n > 1 && (
-          <View style={{ position: 'absolute', bottom: 6, left: 0, right: 0, flexDirection: row, justifyContent: 'center', gap: 2 }} pointerEvents="box-none">
-            {slides.map((s, k) => (
-              <Pressable key={s.id} accessibilityRole="button" accessibilityLabel={`الشريحة ${k + 1}: ${s.titleAr}`} hitSlop={4}
-                onPress={() => { setPaused(true); setI(k); list.current?.scrollToIndex({ index: k, animated: true }); }}
-                style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
-                <View style={k === i ? { width: 18, height: 6, borderRadius: 3, backgroundColor: '#F2B705' } : { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' }} />
-              </Pressable>
-            ))}
-          </View>
-        )}
-      </View>
+    <View style={{ height: h, borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#0B6E4F' }} {...pan.panHandlers}
+      accessibilityRole="adjustable" accessibilityLabel={`الشريحة ${cur + 1} من ${n}: ${s.titleAr}`}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={(e) => go(e.nativeEvent.actionName === 'increment' ? 1 : -1)}>
+      <Animated.View style={{ flex: 1, opacity: fade }}>
+        <Slide s={s} w={w} h={h} />
+      </Animated.View>
+      {n > 1 && (
+        <View style={{ position: 'absolute', bottom: 6, left: 0, right: 0, flexDirection: row, justifyContent: 'center', gap: 2 }} pointerEvents="box-none">
+          {slides.map((x, k) => (
+            <Pressable key={x.id} accessibilityRole="button" accessibilityLabel={`الشريحة ${k + 1}: ${x.titleAr}`} hitSlop={4}
+              onPress={() => { setPaused(true); go(k - cur); }}
+              style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={k === cur ? { width: 18, height: 6, borderRadius: 3, backgroundColor: '#F2B705' } : { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' }} />
+            </Pressable>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
