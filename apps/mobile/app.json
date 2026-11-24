@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "ساحة",
+    "slug": "saha",
+    "scheme": "saha",
+    "version": "0.7.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0B6E4F",
+    "primaryColor": "#0B6E4F",
+    "description": "كل جمهور يستحق بطولته",
+    "ios": { "supportsTablet": false, "bundleIdentifier": "app.saha.iq" },
+    "android": { "package": "app.saha.iq" },
+    "extra": { "supportsRTL": true, "forcesRTL": true }
+  }
+}

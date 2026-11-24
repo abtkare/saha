@@ -2,6 +2,7 @@ packages:
   - "apps/*"
   - "packages/*"
   - "!apps/preview"
+  - "!apps/mobile"
 onlyBuiltDependencies:
   - prisma
   - "@prisma/client"

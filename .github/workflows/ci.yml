@@ -104,9 +104,34 @@ jobs:
             git pull --rebase origin main && git push
           fi
 
+  mobile:
+    name: التطبيق (Expo) — الأنواع والاختبارات والبناء
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env: { CI: "1", EXPO_NO_TELEMETRY: "1" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: تثبيت الحزم
+        run: npm install --no-audit --no-fund
+      - name: تطابق الإصدارات مع Expo SDK
+        run: npx expo install --check || (echo "::warning title=إصدارات Expo::بعض الحزم لا تطابق إصدارات SDK" && true)
+      - name: فحص الأنواع
+        run: npx tsc --noEmit
+      - name: اختبارات المنطق
+        run: npm test
+      - name: البناء (expo export)
+        run: npx expo export --platform ios --platform android --no-bytecode --output-dir dist && ls dist && cat dist/metadata.json | head -c 400
+      - name: حفظ package-lock.json للمراجعة
+        uses: actions/upload-artifact@v4
+        with: { name: mobile-lock, path: apps/mobile/package-lock.json }
+
   stack:
     name: التشغيل بأمر واحد ورفع الصور
-    needs: test
+    needs: [test, mobile]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -141,6 +166,17 @@ jobs:
           curl -sf localhost:8098/privacy | grep -q 'الخصوصية'
           curl -sf localhost:8098/app | grep -q 'تطبيق ساحة'
           curl -sf localhost:8098/admin > /dev/null
+          # الجلسة 7: خادم التطبيق لـ Expo Go
+          curl -sf localhost:8098/app | grep -q 'exp://localhost:8098/expo'
+          m=$(curl -sf -H 'expo-platform: ios' -H 'accept: application/expo+json,application/json' localhost:8098/expo)
+          echo "$m" | head -c 600; echo
+          echo "$m" | grep -q '"runtimeVersion":"exposdk:58'
+          echo "$m" | grep -q '"apiUrl":"http://localhost:8098/api/v1"'
+          bundle=$(echo "$m" | node -e "process.stdout.write(JSON.parse(require('fs').readFileSync(0)).launchAsset.url)")
+          curl -sf "$bundle" | head -c 200 > /dev/null
+          curl -sf -o /dev/null localhost:8098/expo-app/fonts/Cairo_800ExtraBold.ttf
+          curl -sf -H 'expo-platform: android' -H 'accept: multipart/mixed' localhost:8098/expo | grep -q 'name="manifest"'
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'accept: text/html' localhost:8098/expo); test "$code" = 307
           curl -sf localhost:8098/sponsor/portal > /dev/null
           code=$(curl -s -o /dev/null -w '%{http_code}' localhost:8098/matches/999999); test "$code" = 404
           curl -sf -X POST localhost:8098/api/v1/sponsor-leads -H 'content-type: application/json' \

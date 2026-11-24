@@ -197,6 +197,7 @@ model User {
   handledSponsorLeads SponsorLead[]
   mediaAssets         MediaAsset[]
   notifications       Notification[]
+  pushTokens          PushToken[]
 
   @@index([guardianId])
   @@map("users")
@@ -438,6 +439,8 @@ model Match {
   /// نتيجة نصية مباشرة يحدّثها الحكم (شريحة «مباراة اليوم»)
   liveText       String?      @map("live_text")
   liveTextAt     DateTime?    @map("live_text_at") @db.Timestamptz(3)
+  /// متى أُرسل تذكير «مباراتك بعد ساعة» (الجلسة 7). يُصفَّر عند تغيير الموعد.
+  reminderSentAt DateTime?    @map("reminder_sent_at") @db.Timestamptz(3)
   sheetPhotoUrl  String?      @map("sheet_photo_url")
   /// صورة ورقة المباراة المرفوعة (لا تُعرض للعامة)
   sheetMediaId   Int?         @map("sheet_media_id")
@@ -668,12 +671,31 @@ model Notification {
   bodyAr    String    @map("body_ar")
   data      Json?
   readAt    DateTime? @map("read_at") @db.Timestamptz(3)
+  /// وقت إرساله لهاتف المستخدم عبر Expo Push (أو تجاوزه) — الجلسة 7
+  pushedAt  DateTime? @map("pushed_at") @db.Timestamptz(3)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([userId, createdAt])
+  @@index([pushedAt, createdAt])
   @@map("notifications")
+}
+
+/// رمز Expo Push لجهاز المستخدم (الجلسة 7). الرمز الواحد لجهاز واحد، وينتقل لمن سجّل الدخول عليه أخيراً.
+model PushToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @map("user_id")
+  token      String    @unique
+  platform   String
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  disabledAt DateTime? @map("disabled_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([userId])
+  @@map("push_tokens")
 }
 
 // ───────────── سجل التدقيق ─────────────

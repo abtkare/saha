@@ -15,6 +15,7 @@ import { AuthModule } from './auth/auth.module';
 import { ResultsController, ResultsService } from './matches/results';
 import { ResultSweeper } from './matches/result-sweeper';
 import { NotificationsController, NotificationsService } from './notifications/notifications';
+import { PushController, PushService } from './notifications/push';
 import { MediaController, UploadsController, UploadsService } from './uploads/uploads';
 import { HeroController, SlidesAdminController, SlidesService } from './content/slides';
 import { SponsorLeadsPublicController, SponsorsController, SponsorsService } from './content/sponsors';
@@ -26,13 +27,13 @@ import { PostsAdminController, PostsPublicController, PostsService } from './con
     HealthController,
     TournamentsController, TournamentManageController,
     MatchesController, MatchManageController, ResultsController,
-    NotificationsController, UploadsController, MediaController,
+    NotificationsController, PushController, UploadsController, MediaController,
     TeamsPublicController, TeamsController,
     HeroController, SlidesAdminController, SponsorLeadsPublicController, SponsorsController, PostsPublicController, PostsAdminController,
   ],
   providers: [
     TournamentsService, TournamentManageService, MatchesService, MatchManageService, TeamsService,
-    ResultsService, ResultSweeper, NotificationsService, UploadsService,
+    ResultsService, ResultSweeper, NotificationsService, PushService, UploadsService,
     SlidesService, SponsorsService, PostsService,
   ],
 })

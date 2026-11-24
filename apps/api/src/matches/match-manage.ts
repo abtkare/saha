@@ -39,6 +39,7 @@ export class MatchManageService {
         throw new AppError(400, 'VALIDATION_ERROR', 'الموعد بصيغة 2026-12-04T16:00:00+03:00.');
       }
       data.kickoffAt = d;
+      data.reminderSentAt = null; // موعد جديد ← تذكير جديد
     }
     const venue = nullableStr(body, 'venue', { max: 80, label: 'الملعب' });
     if (venue !== undefined) data.venue = venue;

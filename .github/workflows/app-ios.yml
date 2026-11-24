@@ -1,0 +1,128 @@
+name: التطبيق على محاكي آيفون (Expo Go)
+
+# يشغّل «ساحة» كاملة على جهاز macOS (قاعدة + API + الموقع مع خادم Expo Go)، ويثبّت Expo Go على محاكي آيفون،
+# ويفتح التطبيق من الرابط exp://…/expo كما يفعل الآيفون الحقيقي، ثم يلتقط كل الشاشات فاتحة وداكنة.
+# اللقطات في الفرع ci-shots-app. (دقائق macOS مكلفة: يعمل فقط عند تغيّر التطبيق أو يدوياً.)
+on:
+  workflow_dispatch:
+  push:
+    branches: ['session-*']
+    paths: ['apps/mobile/**', 'apps/web/app/expo/**', 'apps/web/lib/expo-manifest.ts', '.github/workflows/app-ios.yml', '.github/scripts/app-shots.mjs']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      DATABASE_URL: postgresql://saha:saha@127.0.0.1:5432/saha
+      ADMIN_EMAIL: admin@saha.local
+      ADMIN_INITIAL_PASSWORD: ci_only_password
+      SEED_DEMO: "true"
+      OTP_PROVIDER: dev
+      NODE_ENV: development
+      JWT_SECRET: ci-jwt-secret-ci-jwt-secret-ci-jwt-secret-1234
+      JWT_REFRESH_SECRET: ci-refresh-secret-ci-refresh-secret-ci-12345
+      STORAGE_DIR: /tmp/saha-uploads
+      TZ: Asia/Baghdad
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - name: تشغيل المحاكي مبكراً (يأخذ وقتاً)
+        run: |
+          xcrun simctl list runtimes
+          UDID=$(xcrun simctl list devices available -j | node -e "
+            const j=JSON.parse(require('fs').readFileSync(0));
+            const all=Object.entries(j.devices).filter(([r])=>r.includes('iOS')).flatMap(([r,d])=>d.map(x=>({...x,r})));
+            const pick=all.reverse().find(d=>/iPhone 1[5-9] Pro$|iPhone 1[5-9]$|iPhone 2\d/.test(d.name))||all.find(d=>d.name.startsWith('iPhone'));
+            console.error(pick.name, pick.r); process.stdout.write(pick.udid)")
+          echo "UDID=$UDID" >> $GITHUB_ENV
+          # موافقة مسبقة على فتح روابط exp:// في Expo Go (بدل نافذة «Open in Expo Go?» التي تحتاج ضغطة)
+          P="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Preferences/com.apple.launchservices.schemeapproval.plist"
+          mkdir -p "$(dirname "$P")"
+          /usr/libexec/PlistBuddy -c "Add :com.apple.CoreSimulator.CoreSimulatorBridge-->exp string host.exp.Exponent" "$P" || true
+          /usr/libexec/PlistBuddy -c "Print" "$P"
+          xcrun simctl boot "$UDID"
+
+      - name: PostgreSQL
+        run: |
+          brew install postgresql@16 >/dev/null
+          brew services start postgresql@16
+          export PATH="$(brew --prefix postgresql@16)/bin:$PATH"
+          for i in $(seq 1 30); do pg_isready -h 127.0.0.1 && break; sleep 1; done
+          psql -h 127.0.0.1 -d postgres -c "CREATE ROLE saha LOGIN SUPERUSER PASSWORD 'saha'" -c "CREATE DATABASE saha OWNER saha"
+          echo "$(brew --prefix postgresql@16)/bin" >> $GITHUB_PATH
+
+      - name: بناء الخادم والموقع
+        run: |
+          pnpm install --no-frozen-lockfile
+          pnpm build
+          cd apps/api && npx prisma migrate deploy && node dist/prisma/seed.js
+
+      - name: بناء التطبيق (نفس خطوات Dockerfile الموقع)
+        working-directory: apps/mobile
+        run: |
+          npm install --no-audit --no-fund
+          METRO_PORT=8091 scripts/build-expo-go.sh
+          rm -rf ../web/.next/standalone/apps/web/public/expo-app
+          mkdir -p ../web/.next/standalone/apps/web/public
+          cp -R ../web/public/. ../web/.next/standalone/apps/web/public/
+          cp -R dist ../web/.next/standalone/apps/web/public/expo-app
+          mkdir -p ../web/.next/standalone/apps/web/.next && cp -R ../web/.next/static ../web/.next/standalone/apps/web/.next/static
+
+      - name: تشغيل الخادم والموقع
+        run: |
+          (cd apps/api && PORT=3001 nohup node dist/src/main.js > /tmp/api.log 2>&1 &)
+          (cd apps/web/.next/standalone && PORT=8097 HOSTNAME=0.0.0.0 API_INTERNAL_URL=http://127.0.0.1:3001 EXPO_CI_MODE=true nohup node apps/web/server.js > /tmp/web.log 2>&1 &)
+          nohup node .github/scripts/log-proxy.mjs 8098 8097 > /tmp/proxy.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf 127.0.0.1:8098/api/v1/health && break; sleep 1; done
+          curl -sf -H 'expo-platform: ios' -H 'accept: application/json' 127.0.0.1:8098/expo | head -c 800; echo
+
+      - name: تثبيت Expo Go على المحاكي
+        run: |
+          curl -s https://api.expo.dev/v2/versions/latest -o /tmp/versions.json
+          URL=$(node -e "
+            const j=JSON.parse(require('fs').readFileSync('/tmp/versions.json'));const d=j.data??j;
+            const s=d.sdkVersions?.['58.0.0']; if(!s){console.error(Object.keys(d.sdkVersions||d));process.exit(1)}
+            process.stdout.write(s.iosClientUrl)")
+          echo "Expo Go: $URL"
+          curl -sL "$URL" -o /tmp/expo-go.tar.gz
+          mkdir -p /tmp/Exponent.app && tar -xzf /tmp/expo-go.tar.gz -C /tmp/Exponent.app
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" /tmp/Exponent.app
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryLevel 100 --cellularBars 4 || true
+          # الحكم ومدير الفريق (حسابات اختبار) قبل فتح التطبيق
+          node .github/scripts/app-shots.mjs app-shots
+          psql "$DATABASE_URL" -f ref.sql
+
+      - name: فتح التطبيق والتقاط الشاشات
+        run: node .github/scripts/app-shots.mjs app-shots --shots
+
+      - name: السجلات
+        if: always()
+        run: |
+          tail -40 /tmp/api.log || true
+          tail -40 /tmp/web.log || true
+          echo "=== طلبات Expo Go"; grep -v "/api/v1/" /tmp/proxy.log | head -80 || true
+          xcrun simctl io "$UDID" screenshot --type=png app-shots/zz-final.png || true
+          ls -la app-shots || true
+
+      - name: حفظ اللقطات في الفرع ci-shots-app
+        if: always()
+        run: |
+          cd app-shots
+          git init -q -b ci-shots-app
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "لقطات التطبيق ${{ github.sha }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" ci-shots-app

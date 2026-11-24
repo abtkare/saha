@@ -1,0 +1,11 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@saha/shared": ["../../packages/shared/src/index.ts"],
+      "@saha/ui": ["../../packages/ui/src/index.ts"]
+    }
+  },
+  "include": ["src", "index.js", "../../packages/shared/src", "../../packages/ui/src"]
+}
