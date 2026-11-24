@@ -1,0 +1,13 @@
+{
+  "cli": { "version": ">= 16.0.0", "appVersionSource": "remote" },
+  "build": {
+    "production": {
+      "channel": "production",
+      "autoIncrement": true,
+      "env": { "SAHA_EAS": "1", "SAHA_STORE": "1", "SAHA_WEB_URL": "https://saha.72-61-18-234.sslip.io" }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
