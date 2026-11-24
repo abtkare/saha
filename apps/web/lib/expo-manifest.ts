@@ -54,7 +54,8 @@ export function buildManifest(built: Built, platform: string, origin: string) {
   const m = JSON.parse(JSON.stringify(recorded).split(devHost).join(host));
   const projectId: string | undefined = process.env.EXPO_PROJECT_ID || built.config.extra?.eas?.projectId || undefined;
   m.id = uuidFrom(`${platform}:${built.builtAt}:${origin}:${projectId ?? ''}:${process.env.EXPO_CI_MODE ?? ''}`);
-  m.createdAt = built.builtAt;
+  // بأجزاء الثانية كما يرسلها خادم Expo (2026-11-24T02:10:40.370Z) — Expo Go يتعطل بدونها
+  m.createdAt = new Date(built.builtAt).toISOString();
   // launchAsset يبقى بعنوان خادم التطوير نفسه (/index.bundle?platform=…): Expo Go يقرأ معاملات هذا العنوان،
   // وبدونها يتوقف قبل تنزيل الحزمة (مُثبت في CI). المسار يقدّمه app/index.bundle/route.ts من الحزمة المحفوظة.
   m.extra.expoClient = {
