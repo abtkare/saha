@@ -108,7 +108,7 @@ async function prepare(format: 'league' | 'knockout', teams: Mgr[], name: string
 beforeAll(async () => {
   await db.connect();
   const env: NodeJS.ProcessEnv = {
-    ...process.env, PORT: String(PORT), NODE_ENV: 'test', OTP_PROVIDER: 'dev', RESULT_SWEEP_SECONDS: '1',
+    ...process.env, PORT: String(PORT), NODE_ENV: 'test', OTP_PROVIDER: 'dev', PUSH_PROVIDER: 'off', // مُرسل Expo Push يعمل في push.e2e وحده (القاعدة مشتركة بين الملفات المتوازية) RESULT_SWEEP_SECONDS: '1',
     JWT_SECRET: 'test-jwt-secret-'.padEnd(48, 'x'), JWT_REFRESH_SECRET: 'test-refresh-secret-'.padEnd(48, 'y'),
   };
   delete env.REDIS_URL;

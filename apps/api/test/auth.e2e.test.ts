@@ -48,7 +48,7 @@ const grant = (userId: number, role: string, scope: { tournamentId?: number; tea
 beforeAll(async () => {
   await db.connect();
   const env: NodeJS.ProcessEnv = {
-    ...process.env, PORT: String(PORT), NODE_ENV: 'test', OTP_PROVIDER: 'dev',
+    ...process.env, PORT: String(PORT), NODE_ENV: 'test', OTP_PROVIDER: 'dev', PUSH_PROVIDER: 'off', // مُرسل Expo Push يعمل في push.e2e وحده (القاعدة مشتركة بين الملفات المتوازية)
     JWT_SECRET: 'test-jwt-secret-'.padEnd(48, 'x'), JWT_REFRESH_SECRET: 'test-refresh-secret-'.padEnd(48, 'y'),
     SWAGGER_ENABLED: 'true',
   };
