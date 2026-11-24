@@ -190,10 +190,14 @@ jobs:
           # ملف السيرفر بعد الاستبدال ($$ ← $) — يثبت أيضاً أن الملف صالح
           cp .env.example infra/.env
           docker compose -f infra/docker-compose.stack.yml config --format json > /tmp/stack.json
-          node -e "const c=JSON.parse(require('fs').readFileSync('/tmp/stack.json'));process.stdout.write(c.services.backup.command[0])" > /tmp/backup.sh
+          node -e "const c=JSON.parse(require('fs').readFileSync('/tmp/stack.json'));process.stdout.write(c.services.backup.command[0].replace(/\\$\\$/g,'\$'))" > /tmp/backup.sh
           rm infra/.env
+          # config يُبقي الهروب $$ في ناتجه (Compose يفكّه عند التشغيل فقط) — نفكّه هنا كما يفعل Compose
+          ! grep -F '$$' /tmp/backup.sh
+          grep -qF '${BACKUP_ONCE:-}' /tmp/backup.sh
+          sh -n /tmp/backup.sh
           mkdir -p /tmp/bk
-          docker run --rm --network saha_net -e TZ=Asia/Baghdad -e PGHOST=saha-db -e POSTGRES_USER=saha \
+          timeout 120 docker run --rm --network saha_net -e TZ=Asia/Baghdad -e PGHOST=saha-db -e POSTGRES_USER=saha \
             -e POSTGRES_PASSWORD=saha_dev_only -e POSTGRES_DB=saha -e BACKUP_KEEP_DAYS=14 -e BACKUP_HOUR=03 -e BACKUP_ONCE=1 \
             -v /tmp/bk:/backups -v /tmp/backup.sh:/backup.sh:ro postgres:16-alpine sh /backup.sh
           f=$(ls /tmp/bk/saha-*.sql.gz | head -1); ls -la /tmp/bk; test -s "$f"
