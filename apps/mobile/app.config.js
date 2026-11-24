@@ -19,8 +19,32 @@ module.exports = ({ config }) => {
     out.owner = EXPO_OWNER;
     extra.eas = { projectId: EXPO_PROJECT_ID };
     out.updates = { ...(config.updates ?? {}), url: `https://u.expo.dev/${EXPO_PROJECT_ID}` };
-    // Expo Go يفتح فقط النسخ المنشورة بنسخة تشغيل SDK نفسه («exposdk:58.0.0»)؛ نسخة المتجر (SAHA_STORE=1) تأخذ رقم الإصدار.
-    out.runtimeVersion = process.env.SAHA_STORE === '1' ? { policy: 'appVersion' } : { policy: 'sdkVersion' };
+    // Expo Go يفتح فقط النسخ المنشورة بنسخة تشغيل SDK نفسه («exposdk:58.0.0»).
+    out.runtimeVersion = { policy: 'sdkVersion' };
+  }
+  if (process.env.SAHA_STORE === '1') {
+    // نسخة المتجر/TestFlight (eas build): أيقونة، نصوص الأذونات بالعربية، وبلا تحديثات عن بُعد في هذه المرحلة.
+    delete out.runtimeVersion;
+    delete out.updates;
+    out.icon = './assets/icon.png';
+    out.ios = {
+      ...out.ios,
+      icon: './assets/icon.png',
+      config: { ...(out.ios?.config ?? {}), usesNonExemptEncryption: false },
+      infoPlist: {
+        ...(out.ios?.infoPlist ?? {}),
+        CFBundleDevelopmentRegion: 'ar',
+        CFBundleAllowMixedLocalizations: true,
+        NSCameraUsageDescription: 'تُستخدم الكاميرا لتصوير ورقة المباراة عند إدخال النتيجة.',
+        NSPhotoLibraryUsageDescription: 'لاختيار صورة ورقة المباراة أو شعار الفريق.',
+      },
+    };
+    out.android = { ...out.android, adaptiveIcon: { foregroundImage: './assets/splash-mark.png', backgroundColor: '#0B6E4F' } };
+    out.plugins = [
+      ...(out.plugins ?? []),
+      ['expo-image-picker', { cameraPermission: 'تُستخدم الكاميرا لتصوير ورقة المباراة عند إدخال النتيجة.', photosPermission: 'لاختيار صورة ورقة المباراة أو شعار الفريق.' }],
+      ['expo-notifications', { color: '#0B6E4F' }],
+    ];
   }
   return out;
 };
