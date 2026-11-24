@@ -48,6 +48,11 @@ jobs:
             const pick=all.reverse().find(d=>/iPhone 1[5-9] Pro$|iPhone 1[5-9]$|iPhone 2\d/.test(d.name))||all.find(d=>d.name.startsWith('iPhone'));
             console.error(pick.name, pick.r); process.stdout.write(pick.udid)")
           echo "UDID=$UDID" >> $GITHUB_ENV
+          # موافقة مسبقة على فتح روابط exp:// في Expo Go (بدل نافذة «Open in Expo Go?» التي تحتاج ضغطة)
+          P="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Preferences/com.apple.launchservices.schemeapproval.plist"
+          mkdir -p "$(dirname "$P")"
+          /usr/libexec/PlistBuddy -c "Add :com.apple.CoreSimulator.CoreSimulatorBridge-->exp string host.exp.Exponent" "$P" || true
+          /usr/libexec/PlistBuddy -c "Print" "$P"
           xcrun simctl boot "$UDID"
 
       - name: PostgreSQL
