@@ -56,7 +56,10 @@ if (process.argv[3] !== '--shots') process.exit(0);
 // ───── اللقطات ─────
 const q = (theme, t) => [`theme=${theme}`, t ? `ci_access=${encodeURIComponent(t.accessToken)}&ci_refresh=${encodeURIComponent(t.refreshToken)}` : ''].filter(Boolean).join('&');
 
-sim('openurl', 'booted', EXP);
+// Expo Go في المقدمة أولاً، حتى لا يسأل النظام «Open in Expo Go?» عند فتح الرابط
+sim('launch', 'booted', 'host.exp.Exponent');
+await shot('00a-expo-go', 10000);
+sim('openurl', 'booted', `${EXP}?__expo_disable_onboarding=1`);
 await shot('00-launch-splash', 3500);
 await shot('01-home-light', 30000);
 

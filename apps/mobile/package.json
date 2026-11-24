@@ -27,6 +27,6 @@
     "@expo-google-fonts/cairo": "*",
     "@expo-google-fonts/ibm-plex-sans-arabic": "*",
     "@types/react": "~19.3.0",
-    "typescript": "~5.9.0"
+    "typescript": "~6.0.3"
   }
 }
