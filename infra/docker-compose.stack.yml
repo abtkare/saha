@@ -112,6 +112,8 @@ services:
       SAHA_DOMAIN: saha.72-61-18-234.sslip.io
       SAHA_UPSTREAM: 127.0.0.1:${HOST_HTTP_PORT:-8098}
       SAHA_DIR: /docker/saha-stack
+      # طوارئ: غيّر "0" إلى "1" ثم Deploy ← يحذف ملف ساحة من Nginx وحده ويعيده كما كان (ساحة تبقى على :8098)
+      SAHA_EDGE_REMOVE: "0"
     entrypoint: ["bash", "/repo/apps/api/ops/edge.sh"]
     healthcheck: { disable: true }
     depends_on: [web]

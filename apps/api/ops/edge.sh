@@ -12,7 +12,7 @@
 #   - تبقى تعمل: تجدد الشهادة كل 12 ساعة (certbot لا يجددها إلا قبل انتهائها بـ 30 يوماً) وتعيد تحميل Nginx عند التجديد فقط.
 #
 # المتغيرات: SAHA_DOMAIN (إلزامي) · SAHA_UPSTREAM (127.0.0.1:8098) · SAHA_DIR (/docker/saha-stack)
-#            SAHA_ACME=letsencrypt|selfsigned (selfsigned للاختبار في CI فقط) · SAHA_EDGE_ONCE=1 (للاختبار: نفّذ ثم اخرج)
+#            SAHA_EDGE_REMOVE=1 (طوارئ: احذف ملف ساحة من Nginx وتوقف) · SAHA_ACME=letsencrypt|selfsigned (selfsigned للاختبار في CI فقط) · SAHA_EDGE_ONCE=1 (للاختبار: نفّذ ثم اخرج)
 set -uo pipefail
 
 D="${SAHA_DOMAIN:?SAHA_DOMAIN مطلوب}"
@@ -55,6 +55,19 @@ log "ملف موقع ساحة: $CONF"
 if H test -e "$CONF" && ! H grep -qF "$MARK" "$CONF"; then
   stop_here "الملف $CONF موجود وليس من صنع saha-edge — لن أكتب فوقه."
 fi
+# ---------- مفتاح الطوارئ: SAHA_EDGE_REMOVE=1 يحذف ملف ساحة فقط ويعيد Nginx كما كان قبلها ----------
+if [ "${SAHA_EDGE_REMOVE:-}" = 1 ]; then
+  if H test -e "$CONF"; then
+    H rm -f "$CONF"
+    H nginx -t >/dev/null 2>&1 && H nginx -s reload
+    log "🧹 حذفت ملف ساحة $CONF وأعدت تحميل Nginx — المواقع الأخرى لم تُلمس. ساحة باقية على http://<IP>:8098."
+  else
+    log "لا يوجد ملف لساحة في Nginx — لا شيء لحذفه."
+  fi
+  [ "${SAHA_EDGE_ONCE:-}" = 1 ] && exit 0
+  exec sleep infinity
+fi
+
 # النطاق مستخدم في موقع آخر؟
 OTHER_DEF="$(H sh -c "grep -rlE 'server_name[^;]*[[:space:]]$D([[:space:];])' /etc/nginx 2>/dev/null | grep -vx '$CONF'" || true)"
 [ -n "$OTHER_DEF" ] && stop_here "النطاق $D معرَّف مسبقاً في: $OTHER_DEF — لن أضيف تعريفاً ثانياً."

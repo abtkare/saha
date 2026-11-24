@@ -266,6 +266,14 @@ jobs:
           grep -q 'ليس من صنع saha-edge' /tmp/edge4.log
           test "$(cat /etc/nginx/conf.d/saha-sslip.conf)" = '# ملف يدوي'
           sudo cp /tmp/saha-sslip.bak /etc/nginx/conf.d/saha-sslip.conf
+          # 5) مفتاح الطوارئ SAHA_EDGE_REMOVE=1: يحذف ملف ساحة وحده، والموقع الآخر يبقى
+          edge -e SAHA_UPSTREAM=127.0.0.1:8098 -e SAHA_EDGE_REMOVE=1 > /tmp/edge5.log 2>&1 || { cat /tmp/edge5.log; exit 1; }
+          cat /tmp/edge5.log
+          grep -q '🧹' /tmp/edge5.log
+          test ! -e /etc/nginx/conf.d/saha-sslip.conf
+          sudo nginx -t
+          test "$(other http)" = khousousi-ok && test "$(other https)" = khousousi-tls
+          test -z "$(site https://$D/ | grep 'كل جمهور يستحق بطولته' || true)"
 
       - name: لقطات المقارنة البصرية (المعاينة مقابل الموقع)
         run: |
