@@ -128,7 +128,7 @@ export function Field({ label, hint, error, style, ...rest }: TextInputProps & {
 export function Tabs<K extends string>({ items, value, onChange, scroll }: { items: { key: K; label: string }[]; value: K; onChange: (k: K) => void; scroll?: boolean }) {
   const { c } = useTheme();
   // القائمة الأفقية تبدأ من اليمين (أول تبويب) في الواجهة العربية
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<{ scrollToEnd: (o?: { animated?: boolean }) => void } | null>(null);
   const body = items.map((it) => {
     const on = it.key === value;
     return (
@@ -143,7 +143,7 @@ export function Tabs<K extends string>({ items, value, onChange, scroll }: { ite
   const box: ViewStyle = { flexDirection: row, gap: 6, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: radius.pill, padding: 4 };
   if (!scroll) return <View style={box} accessibilityRole="tablist">{body}</View>;
   return (
-    <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+    <ScrollView ref={scrollRef as never} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
       onContentSizeChange={() => { if (!isRTL) scrollRef.current?.scrollToEnd({ animated: false }); }}>
       <View style={box} accessibilityRole="tablist">{body}</View>
     </ScrollView>
