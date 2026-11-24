@@ -56,6 +56,7 @@ export class MeController {
       this.prisma.user.update({ where: { id }, data: { status: 'deleted', phone: null, email: null, fullName: 'حساب محذوف', passwordHash: null, totpSecret: null, totpEnabled: false } }),
       this.prisma.session.updateMany({ where: { userId: id, revokedAt: null }, data: { revokedAt: new Date() } }),
       this.prisma.userRole.deleteMany({ where: { userId: id } }),
+      this.prisma.pushToken.deleteMany({ where: { userId: id } }),
     ]);
     await this.audit.record({ actorUserId: id, action: 'user.delete', entity: 'user', entityId: id, ip: clientIp(req) });
     return { ok: true };

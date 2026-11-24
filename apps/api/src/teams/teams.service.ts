@@ -9,6 +9,7 @@ import { bool, int, nullableStr, str } from '../common/validate';
 import { assertActive, assertCan } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { eligibilityProblems, publicPlayerName, PUBLIC_PLAYER_SELECT } from './players';
+import { NotificationsService } from '../notifications/notifications';
 
 type B = Record<string, unknown>;
 type Ctx = { auth: AuthContext; ip: string };
@@ -29,7 +30,7 @@ const TEAM_NOT_FOUND = () => new AppError(404, 'TEAM_NOT_FOUND', 'الفريق �
 /** الفرق: الإنشاء، الصفحة العامة، اللاعبون، رمز الانضمام، التوثيق اليدوي */
 @Injectable()
 export class TeamsService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly notifications: NotificationsService) {}
 
   private async adult(userId: number, what: string) {
     const u = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
@@ -305,6 +306,10 @@ export class TeamsService {
       await tx.teamVerificationRequest.update({ where: { id: requestId }, data: { status: approve ? 'approved' : 'rejected', note, reviewedById: auth.userId, reviewedAt: now } });
       if (approve) await tx.team.update({ where: { id: req.teamId }, data: { verifiedAt: now, verifyMethod: 'manual' } });
       await this.audit.record({ actorUserId: auth.userId, action: approve ? 'team.verify' : 'team.verify_reject', entity: 'team', entityId: req.teamId, payload: { requestId, note }, ip }, tx);
+      const team = await tx.team.findUniqueOrThrow({ where: { id: req.teamId }, select: { managerId: true, nameAr: true } });
+      await this.notifications.notify([team.managerId], approve
+        ? { titleAr: 'وُثّقت صفحة فريقك', bodyAr: `صار «${team.nameAr}» فريقاً موثّقاً في ساحة.`, data: { type: 'team.verified', teamId: req.teamId } }
+        : { titleAr: 'لم يُقبل طلب التوثيق', bodyAr: note ? `«${team.nameAr}»: ${note}` : `راجع منشور التوثيق لفريق «${team.nameAr}» وأعد المحاولة.`, data: { type: 'team.verify_rejected', teamId: req.teamId } }, tx);
     });
     return { ok: true, status: approve ? 'approved' : 'rejected' };
   }

@@ -11,11 +11,30 @@ COPY apps/web apps/web
 RUN pnpm install --filter "@saha/web..." --no-frozen-lockfile
 RUN pnpm --filter @saha/shared build && pnpm --filter @saha/ui build && pnpm --filter @saha/web build
 
+# التطبيق (الجلسة 7): حزمة Expo مبنية مسبقاً يقدّمها الموقع على /expo لتطبيق Expo Go
+FROM node:22-bookworm-slim AS mobile
+ENV CI=1 EXPO_NO_TELEMETRY=1
+WORKDIR /repo
+COPY packages/shared/src packages/shared/src
+COPY packages/ui/src packages/ui/src
+COPY apps/mobile/package.json apps/mobile/package-lock.json* apps/mobile/
+RUN cd apps/mobile && npm install --no-audit --no-fund
+COPY apps/mobile apps/mobile
+RUN cd apps/mobile \
+ && npx expo export --platform ios --platform android --no-bytecode --output-dir dist \
+ && npx expo config --type public --json > dist/expo-config.json \
+ && date -u +%Y-%m-%dT%H:%M:%SZ > dist/built-at.txt \
+ && mkdir -p dist/fonts \
+ && for f in Cairo_700Bold Cairo_800ExtraBold IBMPlexSansArabic_400Regular IBMPlexSansArabic_500Medium IBMPlexSansArabic_600SemiBold; do \
+      src=$(find node_modules/@expo-google-fonts -name "$f.ttf" | head -1); test -n "$src"; cp "$src" dist/fonts/; done \
+ && ls -la dist dist/fonts && cat dist/metadata.json | head -c 600
+
 FROM node:22-bookworm-slim AS run
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 TZ=Asia/Baghdad PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
 COPY --from=build /repo/apps/web/.next/standalone ./
 COPY --from=build /repo/apps/web/.next/static ./apps/web/.next/static
 COPY --from=build /repo/apps/web/public ./apps/web/public
+COPY --from=mobile /repo/apps/mobile/dist ./apps/web/public/expo-app
 EXPOSE 3000
 CMD ["node", "apps/web/server.js"]

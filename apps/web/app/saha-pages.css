@@ -224,3 +224,9 @@ a.team{color:inherit}
 [data-theme='dark'] .slide-img{box-shadow:0 24px 48px rgba(0,0,0,.4)}
 [data-theme='dark'] .btn-danger{color:#0E1A24}
 @media print{[data-theme='dark']{--color-primary:#0B6E4F;--color-ink:#0E1A24;--color-bg:#F6F3EC;--color-surface:#fff;--color-muted:#5B6770;--color-border:#E3DED2}}
+
+/* الجلسة 7: تجربة التطبيق عبر Expo Go */
+.try-app{padding:24px;display:flex;flex-direction:column;gap:14px;align-items:flex-start}
+.try-app h2{font-size:24px}
+.try-app .steps{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:8px;line-height:1.7}
+.try-app code{font-size:13px;background:var(--color-bg);padding:2px 6px;border-radius:6px;word-break:break-all}

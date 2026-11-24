@@ -256,3 +256,19 @@ export const SPONSOR_LEAD_STATUS_LABELS: Record<SponsorLeadStatus, string> = {
 export function ctr(impressions: number, clicks: number): number {
   return impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : 0;
 }
+
+// ───────────── التطبيق وإشعارات الهاتف (الجلسة 7) ─────────────
+
+export const PUSH_PLATFORMS = ['ios', 'android'] as const;
+export type PushPlatform = (typeof PUSH_PLATFORMS)[number];
+
+/** رمز Expo Push كما يصدره expo-notifications: ExponentPushToken[...] */
+export function isExpoPushToken(token: unknown): token is string {
+  return typeof token === 'string' && /^(ExponentPushToken|ExpoPushToken)\[[A-Za-z0-9_-]{8,200}\]$/.test(token);
+}
+
+/**
+ * وجهة الإشعار داخل التطبيق (حقل data في الإشعار). يقرأها التطبيق ليفتح الشاشة المناسبة عند الضغط.
+ * matchId ← شاشة المباراة، tournamentId ← البطولة، teamId ← الفريق، disputeId ← المباراة المعنية.
+ */
+export interface NotificationTarget { matchId?: number; tournamentId?: number; teamId?: number; disputeId?: number }

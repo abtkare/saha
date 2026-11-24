@@ -12,6 +12,7 @@ import { assertActive, assertCan } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { eligibilityProblems } from '../teams/players';
 import { computeStandings } from './standings';
+import { NotificationsService } from '../notifications/notifications';
 import {
   GROUP_LABELS, crossQualifiers, drawGroups, isPowerOfTwo, knockoutStage, knockoutWinner, newSeed, pairUp, roundRobin,
   schedule, shuffle, type Pair,
@@ -40,7 +41,7 @@ const dbDate = (d: string | undefined) => (d === undefined ? undefined : new Dat
  */
 @Injectable()
 export class TournamentManageService {
-  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService) {}
+  constructor(private readonly prisma: PrismaService, private readonly audit: AuditService, private readonly notifications: NotificationsService) {}
 
   private async load(id: number) {
     const t = await this.prisma.tournament.findUnique({ where: { id } });
@@ -268,7 +269,14 @@ export class TournamentManageService {
     }
     const status = approve ? 'approved' : 'rejected';
     const updated = await this.prisma.tournamentRegistration.update({ where: { id: regId }, data: { status } });
-    await this.audit.record({ actorUserId: auth.userId, action: `registration.${status}`, entity: 'tournament_registration', entityId: regId, payload: { tournamentId: id, teamId: reg.teamId, note: str(body, 'note', { optional: true, max: 200 }) ?? null }, ip });
+    const note = str(body, 'note', { optional: true, max: 200 }) ?? null;
+    await this.audit.record({ actorUserId: auth.userId, action: `registration.${status}`, entity: 'tournament_registration', entityId: regId, payload: { tournamentId: id, teamId: reg.teamId, note }, ip });
+    const team = await this.prisma.team.findUnique({ where: { id: reg.teamId }, select: { managerId: true, nameAr: true } });
+    if (team) {
+      await this.notifications.notify([team.managerId], approve
+        ? { titleAr: 'قُبل فريقك في البطولة', bodyAr: `«${team.nameAr}» مسجّل الآن في ${reg.tournament.nameAr}.`, data: { type: 'registration.approved', tournamentId: id, teamId: reg.teamId } }
+        : { titleAr: 'لم يُقبل تسجيل فريقك', bodyAr: `${reg.tournament.nameAr}${note ? `: ${note}` : '.'}`, data: { type: 'registration.rejected', tournamentId: id, teamId: reg.teamId } });
+    }
     return updated;
   }
 
