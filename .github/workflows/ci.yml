@@ -126,6 +126,25 @@ jobs:
           curl -sf "localhost:8098/api/v1/news" | grep -q saha-launch
           echo "$html" | grep -q 'class="splash'
           echo "$html" | grep -q 'البطولات الجارية'
+          # الجلسة 6: صفحات الموقع العام واللوحة وبوابة الراعي
+          echo "$html" | grep -q 'theme-btn'
+          curl -sf localhost:8098/tournaments | grep -q 'متابعو المؤثرين'
+          curl -sf "localhost:8098/tournaments?kind=facebook_group" | grep -q 'بطولة أعضاء مجموعة شباب الحلة'
+          curl -sf localhost:8098/news | grep -q 'saha-launch'
+          curl -sf localhost:8098/news/saha-launch | grep -q 'كل جمهور يستحق بطولته'
+          mid=$(curl -sf localhost:8098/api/v1/tournaments/baghdad-sahat-2026 | node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync(0)).matches[0].id))")
+          tid=$(curl -sf localhost:8098/api/v1/tournaments/baghdad-sahat-2026 | node -e "process.stdout.write(String(JSON.parse(require('fs').readFileSync(0)).registrations[0].team.id))")
+          curl -sf localhost:8098/matches/$mid | grep -q 'حالة النتيجة'
+          curl -sf localhost:8098/teams/$tid | grep -q 'اللاعبون'
+          curl -sf localhost:8098/sponsor | grep -q 'اطلب التواصل'
+          curl -sf localhost:8098/terms | grep -q 'الشروط'
+          curl -sf localhost:8098/privacy | grep -q 'الخصوصية'
+          curl -sf localhost:8098/app | grep -q 'تطبيق ساحة'
+          curl -sf localhost:8098/admin > /dev/null
+          curl -sf localhost:8098/sponsor/portal > /dev/null
+          code=$(curl -s -o /dev/null -w '%{http_code}' localhost:8098/matches/999999); test "$code" = 404
+          curl -sf -X POST localhost:8098/api/v1/sponsor-leads -H 'content-type: application/json' \
+            -d '{"fullName":"اختبار CI","phone":"07701234567","orgName":"شركة"}' | grep -q 'وصل طلبك'
 
       - name: لقطات المقارنة البصرية (المعاينة مقابل الموقع)
         run: |
@@ -145,6 +164,9 @@ jobs:
           shot 2-web-mobile http://localhost:8098/ 390,5200
           shot 3-web-tournament http://localhost:8098/tournaments/baghdad-sahat-2026 1440,2600
           shot 4-web-tournament-mobile http://localhost:8098/tournaments/baghdad-sahat-2026 390,4400
+          # الجلسة 6: الوضع الداكن والصفحات الجديدة واللوحة (بدخول مدير عام عبر TOTP)
+          node .github/scripts/shots.mjs http://localhost:8099 shots --preview
+          ADMIN_PASSWORD=change_me_dev node .github/scripts/shots.mjs http://localhost:8098 shots
           ls -la shots
 
       - name: حفظ اللقطات في الفرع ci-shots (للمقارنة من جلسة البرمجة)

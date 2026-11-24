@@ -5,7 +5,7 @@ import { Mark, Trophy } from './mark';
 
 /** بطاقة المباراة — .card.match من المعاينة */
 export function MatchCard({ m, tournamentName, withDay = false }: { m: MatchItem; tournamentName?: string; withDay?: boolean }) {
-  const href = m.tournament ? `/tournaments/${m.tournament.slug}` : undefined;
+  const href = `/matches/${m.id}`;
   const body = (
     <>
       <div className="between">
@@ -16,7 +16,7 @@ export function MatchCard({ m, tournamentName, withDay = false }: { m: MatchItem
       <div className="meta">{withDay && <span>{kickoffDay(m.kickoffAt)}</span>}<span className="num">{kickoffTime(m.kickoffAt)}</span>{m.venue && <span>{m.venue}</span>}</div>
     </>
   );
-  return href ? <a href={href} className="card match">{body}</a> : <div className="card match">{body}</div>;
+  return <a href={href} className="card match">{body}</a>;
 }
 
 /** بطاقة «مباراة اليوم» في الهيرو — .card.live من المعاينة */
@@ -31,7 +31,7 @@ export function LiveCard({ m, label }: { m: MatchItem; label: string }) {
         <div className="team"><span className="crest lg">{initial(m.awayTeam.nameAr)}</span><b>{m.awayTeam.nameAr}</b></div>
       </div>
       <div className="meta">{m.venue && <span>{m.venue}</span>}<span className="num">{kickoffTime(m.kickoffAt)}</span></div>
-      {m.tournament && <a href={`/tournaments/${m.tournament.slug}`} className="more">تفاصيل المباراة</a>}
+      <a href={`/matches/${m.id}`} className="more">تفاصيل المباراة</a>
     </article>
   );
 }
@@ -69,7 +69,7 @@ export function StandingsTable({ rows, full = false }: { rows: StandingRow[]; fu
           {rows.map((r, i) => (
             <tr key={r.team.id} className={i === 0 && r.points > 0 ? 'first' : undefined}>
               <td className="num">{r.position}</td>
-              <td>{r.team.nameAr}</td>
+              <td><a href={`/teams/${r.team.id}`} className="plain">{r.team.nameAr}</a></td>
               <td className="num">{r.played}</td>
               {full && <><td className="num">{r.won}</td><td className="num">{r.drawn}</td><td className="num">{r.lost}</td></>}
               <td className="num">{signed(r.goalDiff)}</td>
@@ -85,10 +85,10 @@ export function StandingsTable({ rows, full = false }: { rows: StandingRow[]; fu
 /** بطاقة الخبر — .card.news من المعاينة */
 export function NewsCard({ n }: { n: NewsItem }) {
   return (
-    <article className="card news">
+    <a href={`/news/${n.slug}`} className="card news">
       <span className="thumb">{n.coverUrl ? <img src={n.coverUrl} alt="" /> : <Mark size={64} />}</span>
       <span className="body"><b>{n.titleAr}</b><span className="muted">{relativeTime(n.publishedAt)}</span></span>
-    </article>
+    </a>
   );
 }
 

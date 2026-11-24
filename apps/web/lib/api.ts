@@ -46,6 +46,20 @@ export interface Standings { tournament: { id: number; nameAr: string; slug: str
 
 export interface NewsItem { id: number; slug: string; titleAr: string; coverUrl: string | null; publishedAt: string | null }
 
+export interface HeroSlide {
+  id: number;
+  type: 'sponsor' | 'news' | 'match' | 'tournament' | 'promo';
+  titleAr: string;
+  subtitleAr: string | null;
+  imageUrl: string | null;
+  linkUrl: string | null;
+  sponsored: boolean;
+  sponsor: { id: number; nameAr: string; logoUrl: string | null; website: string | null } | null;
+  tournament: { id: number; nameAr: string; slug: string } | null;
+  match: (Omit<MatchItem, 'round' | 'tournament'> & { homePens: number | null; awayPens: number | null; liveTextAt: string | null; tournament: { id: number; nameAr: string; slug: string } }) | null;
+}
+export interface Hero { refreshSeconds: number; slides: HeroSlide[] }
+
 export async function apiGet<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(`${API}/api/v1${path}`, { cache: 'no-store' });

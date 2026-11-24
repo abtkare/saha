@@ -18,6 +18,23 @@
     setTimeout(hide, reduce ? 900 : 3900);
   }
 
+  // الوضع الداكن: زر في الرأس، والاختيار يُحفظ في المتصفح
+  var themeBtn = document.getElementById('themeBtn');
+  function syncTheme() {
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    themeBtn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    themeBtn.setAttribute('aria-label', dark ? 'الوضع الفاتح' : 'الوضع الداكن');
+  }
+  if (themeBtn) {
+    syncTheme();
+    themeBtn.addEventListener('click', function () {
+      var dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+      if (dark) document.documentElement.setAttribute('data-theme', 'dark'); else document.documentElement.removeAttribute('data-theme');
+      try { localStorage.setItem('saha_theme', dark ? 'dark' : 'light'); } catch (e) {}
+      syncTheme();
+    });
+  }
+
   var STATUS = {
     provisional: 'مؤقتة', confirmed: 'معتمدة', disputed: 'متنازع عليها', final: 'نهائية', scheduled: 'لم تبدأ'
   };
