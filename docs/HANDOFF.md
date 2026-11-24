@@ -113,6 +113,7 @@
 - **القاعدة:** `migrations/0007_push` (`push_tokens`، `notifications.pushed_at`، `matches.reminder_sent_at`). يُطبَّق تلقائياً عند Update.
 - **CI:** وظيفة `mobile` (الأنواع + الاختبارات + `expo export`)، فحص `/expo` في وظيفة التشغيل، و`.github/workflows/app-ios.yml` على macOS: المنصة كاملة + Expo Go على محاكي آيفون + لقطات كل الشاشات في الفرع `ci-shots-app` (يعمل عند تغيّر التطبيق في فروع `session-*`؛ دقائق macOS أغلى عشر مرات).
 - **Pull Request رقم 7** من الفرع `session-7`.
+- ملاحظة: الفرع `probe-sdk58` (تجربة لمعرفة إصدارات SDK 58) بقي على GitHub لأن الجلسة لا تملك صلاحية حذف الفروع؛ لا يؤثر على شيء ويمكن حذفه من صفحة Branches.
 
 ## خطوات معلّقة (بالترتيب)
 1. ✅ (2026-11-23) المالك فتح `http://72.61.18.234:8098/api/v1/health` من Safari على الآيفون ← `ok` (المنفذ 8098 مفتوح من الخارج). ✅ تحديث الجلسة 3 وصل عبر زر Update في Docker Manager: رابط `/api/v1/tournaments/baghdad-sahat-2026/scorers` يعيد `[]`.
