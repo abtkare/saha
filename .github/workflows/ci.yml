@@ -219,7 +219,7 @@ jobs:
       - name: "الجلسة 8: HTTPS عبر Nginx الموجود دون المساس بالمواقع الأخرى"
         timeout-minutes: 10
         run: |
-          set -x -o pipefail   # حتى يُحسب فشل edge.sh لا نجاح tee في «edge … | tee»
+          set -x
           command -v nginx || { sudo apt-get update -qq && sudo apt-get install -y -qq nginx; }
           # موقع آخر يمثّل «خصوصي» على 80 و443 (كما على السيرفر)
           sudo mkdir -p /etc/nginx/other && cd /etc/nginx/other
@@ -236,8 +236,11 @@ jobs:
             -e SAHA_ACME=selfsigned -e SAHA_EDGE_ONCE=1 "$@" --entrypoint bash ghcr.io/abtkare/saha-api:dev /repo/apps/api/ops/edge.sh; }
           site() { curl -sk --resolve $D:443:127.0.0.1 --resolve $D:80:127.0.0.1 "$@"; }
           # 1) أول تشغيل: إعداد HTTP ← شهادة ← HTTPS
-          edge -e SAHA_UPSTREAM=127.0.0.1:8098 | tee /tmp/edge1.log
+          edge -e SAHA_UPSTREAM=127.0.0.1:8098 > /tmp/edge1.log 2>&1 || { cat /tmp/edge1.log; exit 1; }
+          cat /tmp/edge1.log
           grep -q '🎉' /tmp/edge1.log
+          # الموقع الآخر رُصد قبل التغيير وبعده بنفس الرمز
+          grep -q 'khousousi.test http=200 https=200' /tmp/edge1.log
           site https://$D/api/v1/health | grep -q '"status":"ok"'
           site https://$D/ | grep -q 'كل جمهور يستحق بطولته'
           site https://$D/app | grep -q 'u.expo.dev'
@@ -245,10 +248,12 @@ jobs:
           site -I https://$D/ | grep -qi strict-transport-security
           test "$(other http)" = khousousi-ok && test "$(other https)" = khousousi-tls
           # 2) إعادة التشغيل (زر Update) لا تغيّر شيئاً
-          edge -e SAHA_UPSTREAM=127.0.0.1:8098 | tee /tmp/edge2.log
+          edge -e SAHA_UPSTREAM=127.0.0.1:8098 > /tmp/edge2.log 2>&1 || { cat /tmp/edge2.log; exit 1; }
+          cat /tmp/edge2.log
           grep -q 'لا تغيير' /tmp/edge2.log
           # 3) إعداد خاطئ ← nginx -t يرفضه ← تراجع تلقائي وساحة والموقع الآخر يعملان كما كانا
-          if edge -e "SAHA_UPSTREAM=127.0.0.1:8098 broken" | tee /tmp/edge3.log; then echo "كان يجب أن يفشل"; exit 1; fi
+          if edge -e "SAHA_UPSTREAM=127.0.0.1:8098 broken" > /tmp/edge3.log 2>&1; then cat /tmp/edge3.log; echo "كان يجب أن يفشل"; exit 1; fi
+          cat /tmp/edge3.log
           grep -q 'أعدت Nginx كما كان' /tmp/edge3.log
           sudo nginx -t
           site https://$D/api/v1/health | grep -q '"status":"ok"'
@@ -256,7 +261,8 @@ jobs:
           # 4) لا يكتب فوق ملف ليس من صنعه
           sudo cp /etc/nginx/conf.d/saha-sslip.conf /tmp/saha-sslip.bak
           echo '# ملف يدوي' | sudo tee /etc/nginx/conf.d/saha-sslip.conf >/dev/null
-          if edge -e SAHA_UPSTREAM=127.0.0.1:8098 | tee /tmp/edge4.log; then exit 1; fi
+          if edge -e SAHA_UPSTREAM=127.0.0.1:8098 > /tmp/edge4.log 2>&1; then cat /tmp/edge4.log; echo "كان يجب أن يرفض"; exit 1; fi
+          cat /tmp/edge4.log
           grep -q 'ليس من صنع saha-edge' /tmp/edge4.log
           test "$(cat /etc/nginx/conf.d/saha-sslip.conf)" = '# ملف يدوي'
           sudo cp /tmp/saha-sslip.bak /etc/nginx/conf.d/saha-sslip.conf

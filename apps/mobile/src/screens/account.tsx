@@ -24,6 +24,17 @@ export function AccountScreen() {
   const [name, setName] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
 
+  const [testMsg, setTestMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  const sendTestPush = async () => {
+    setTestMsg(null);
+    try {
+      const r = await api<{ devices: number }>('/me/notifications/test', { method: 'POST' });
+      setTestMsg(r.devices
+        ? { tone: 'ok', text: 'أُرسل. يصلك الإشعار خلال ثوانٍ — جرّب أيضاً إغلاق التطبيق أو قفل الشاشة.' }
+        : { tone: 'error', text: 'لم يُسجَّل أي جهاز لحسابك بعد. اضغط «فعّل إشعارات الهاتف» أولاً.' });
+    } catch (e) { setTestMsg({ tone: 'error', text: errMsg(e) }); }
+  };
+
   const saveName = async () => {
     setMsg(null);
     try { await api('/me', { method: 'PATCH', body: { fullName: name } }); await reload(); setName(null); setMsg({ tone: 'ok', text: 'حُفظ الاسم.' }); } catch (e) { setMsg({ tone: 'error', text: errMsg(e) }); }
@@ -70,7 +81,13 @@ export function AccountScreen() {
                 <ListRow title="كل الإشعارات" subtitle={unread ? `${unread} غير مقروءة` : 'لا جديد'} icon="bell" onPress={() => push({ name: 'notifications' })} />
                 <Divider />
                 <View style={{ padding: 16, gap: 10 }}>
-                  {pushState?.ok ? <Notice tone="ok">إشعارات الهاتف مفعّلة على هذا الجهاز.</Notice> : (
+                  {pushState?.ok ? (
+                    <>
+                      <Notice tone="ok">إشعارات الهاتف مفعّلة على هذا الجهاز.</Notice>
+                      <Button title="أرسل إشعاراً تجريبياً" icon="bell" small kind="secondary" onPress={sendTestPush} />
+                      {testMsg && <Notice tone={testMsg.tone}>{testMsg.text}</Notice>}
+                    </>
+                  ) : (
                     <>
                       {pushState && <T v="small" muted>{pushState.message}</T>}
                       <Button title="فعّل إشعارات الهاتف" icon="bell" small kind="secondary" onPress={async () => { await enablePush(); }} />

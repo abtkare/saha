@@ -62,7 +62,8 @@ OTHER_DEF="$(H sh -c "grep -rlE 'server_name[^;]*[[:space:]]$D([[:space:];])' /e
 IPV6=0; grep -Eq 'listen[[:space:]]+\[::\]' <<<"$NGX_T" && IPV6=1
 
 # ---------- لقطة المواقع الأخرى ----------
-OTHERS="$(grep -E '^[[:space:]]*server_name[[:space:]]' <<<"$NGX_T" | sed -E 's/^[[:space:]]*server_name[[:space:]]+//; s/;.*$//' | tr ' \t' '\n\n' \
+# server_name في أي مكان من السطر (بعض الملفات تكتب الكتلة في سطر واحد)، مع تجاهل التعليقات
+OTHERS="$(sed 's/#.*$//' <<<"$NGX_T" | grep -oE '(^|[[:space:];{])server_name[[:space:]]+[^;]+' | sed -E 's/^.*server_name[[:space:]]+//' | tr ' \t' '\n\n' \
   | grep -Ev '^$|^_$|[*~^$()]|^localhost$' | grep -vxF "$D" | sort -u | head -40)"
 probe() { # host scheme → رمز الاستجابة (من السيرفر نفسه عبر 127.0.0.1)
   local port=80; [ "$2" = https ] && port=443
