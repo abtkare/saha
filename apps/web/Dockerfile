@@ -20,14 +20,8 @@ COPY packages/ui/src packages/ui/src
 COPY apps/mobile/package.json apps/mobile/package-lock.json* apps/mobile/
 RUN cd apps/mobile && npm install --no-audit --no-fund
 COPY apps/mobile apps/mobile
-RUN cd apps/mobile \
- && npx expo export --platform ios --platform android --no-bytecode --output-dir dist \
- && npx expo config --type public --json > dist/expo-config.json \
- && date -u +%Y-%m-%dT%H:%M:%SZ > dist/built-at.txt \
- && mkdir -p dist/fonts \
- && for f in Cairo_700Bold Cairo_800ExtraBold IBMPlexSansArabic_400Regular IBMPlexSansArabic_500Medium IBMPlexSansArabic_600SemiBold; do \
-      src=$(find node_modules/@expo-google-fonts -name "$f.ttf" | head -1); test -n "$src"; cp "$src" dist/fonts/; done \
- && ls -la dist dist/fonts && cat dist/metadata.json | head -c 600
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* \
+ && apps/mobile/scripts/build-expo-go.sh
 
 FROM node:22-bookworm-slim AS run
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 TZ=Asia/Baghdad PORT=3000 HOSTNAME=0.0.0.0

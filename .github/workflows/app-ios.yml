@@ -74,12 +74,7 @@ jobs:
         working-directory: apps/mobile
         run: |
           npm install --no-audit --no-fund
-          npx expo export --platform ios --no-bytecode --output-dir dist
-          npx expo config --type public --json > dist/expo-config.json
-          date -u +%Y-%m-%dT%H:%M:%SZ > dist/built-at.txt
-          mkdir -p dist/fonts
-          for f in Cairo_700Bold Cairo_800ExtraBold IBMPlexSansArabic_400Regular IBMPlexSansArabic_500Medium IBMPlexSansArabic_600SemiBold; do
-            cp "$(find node_modules/@expo-google-fonts -name "$f.ttf" | head -1)" dist/fonts/; done
+          METRO_PORT=8091 scripts/build-expo-go.sh
           rm -rf ../web/.next/standalone/apps/web/public/expo-app
           mkdir -p ../web/.next/standalone/apps/web/public
           cp -R ../web/public/. ../web/.next/standalone/apps/web/public/
@@ -109,26 +104,6 @@ jobs:
           # الحكم ومدير الفريق (حسابات اختبار) قبل فتح التطبيق
           node .github/scripts/app-shots.mjs app-shots
           psql "$DATABASE_URL" -f ref.sql
-
-      - name: تشخيص (مقارنة بخادم التطوير الرسمي)
-        continue-on-error: true
-        run: |
-          mkdir -p app-shots
-          (cd apps/mobile && nohup npx expo start --port 8081 --no-dev --minify > /tmp/metro.log 2>&1 &)
-          for i in $(seq 1 60); do curl -sf 127.0.0.1:8081/status && break; sleep 2; done
-          xcrun simctl launch "$UDID" host.exp.Exponent; sleep 6
-          xcrun simctl spawn "$UDID" log stream --level debug --style compact --predicate 'process == "Expo Go"' > /tmp/expogo.log 2>&1 &
-          LP=$!
-          xcrun simctl openurl "$UDID" "exp://127.0.0.1:8098/expo"; sleep 25
-          xcrun simctl io "$UDID" screenshot --type=png app-shots/d1-ours.png
-          kill $LP || true
-          echo "=== سجل Expo Go (ساحة)"; grep -aiE "javascript|fatal|exception|unhandled|error|bundle|8098|manifest|crash|abort|signal|launch" /tmp/expogo.log | grep -viE "nw_|BoardServices|UIKit|storekit|Crashlytics\] Version" | cut -c1-600 | head -120
-          echo "=== تقارير الأعطال"; find ~/Library/Logs/DiagnosticReports -newer /tmp/metro.log -type f 2>/dev/null | head; f=$(find ~/Library/Logs/DiagnosticReports -newer /tmp/metro.log -type f -iname "*expo*" 2>/dev/null | head -1); [ -n "$f" ] && head -c 8000 "$f"
-          xcrun simctl launch "$UDID" host.exp.Exponent; sleep 4
-          xcrun simctl openurl "$UDID" "exp://127.0.0.1:8081"; sleep 60
-          xcrun simctl io "$UDID" screenshot --type=png app-shots/d2-devserver-prod.png
-          tail -20 /tmp/metro.log
-          xcrun simctl terminate "$UDID" host.exp.Exponent || true
 
       - name: فتح التطبيق والتقاط الشاشات
         run: node .github/scripts/app-shots.mjs app-shots --shots
