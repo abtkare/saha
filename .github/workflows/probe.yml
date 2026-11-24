@@ -1,0 +1,20 @@
+name: probe-sdk
+on:
+  push:
+    branches: [probe-sdk58]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: |
+          cd /tmp && npm view expo@58 version | tail -3
+          npm view expo dist-tags
+          mkdir p && cd p && npm init -y >/dev/null && npm i expo@~58.0.0 --no-audit --no-fund >/dev/null 2>&1
+          echo ==== bundled; cat node_modules/expo/bundledNativeModules.json
+          echo ==== expo pkg deps; node -e "const p=require('./node_modules/expo/package.json');console.log(p.version, JSON.stringify(p.dependencies,null,1), JSON.stringify(p.peerDependencies))"
+          echo ==== export help; npx expo export --help || true
+          echo ==== versions api; curl -s https://api.expo.dev/v2/versions | node -e "const j=JSON.parse(require('fs').readFileSync(0));const s=j.data.sdkVersions['58.0.0'];console.log(JSON.stringify(s,null,1))"
+          echo ==== template; npm view expo-template-default@sdk-58 dependencies devDependencies
+          echo ==== notif; ls node_modules | grep -i expo- | head -80
