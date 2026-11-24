@@ -24,4 +24,4 @@ const lines = [
 console.log(lines.join('\n'));
 if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
 if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `channel_link=${channelLink}\ngroup=${ios.group}\nruntime=${rv}\n`);
-if (!rv.startsWith('exposdk:')) console.log(`::warning title=Expo Go::نسخة التشغيل ${rv} لا تبدأ بـ exposdk: — قد لا يفتحها Expo Go`);
+if (!rv.startsWith('exposdk:')) { console.log(`::error title=Expo Go::نسخة التشغيل ${rv} لا تبدأ بـ exposdk: — Expo Go لن يفتحها`); process.exit(1); }

@@ -19,6 +19,8 @@ module.exports = ({ config }) => {
     out.owner = EXPO_OWNER;
     extra.eas = { projectId: EXPO_PROJECT_ID };
     out.updates = { ...(config.updates ?? {}), url: `https://u.expo.dev/${EXPO_PROJECT_ID}` };
+    // Expo Go يفتح فقط النسخ المنشورة بنسخة تشغيل SDK نفسه («exposdk:58.0.0»)؛ نسخة المتجر (SAHA_STORE=1) تأخذ رقم الإصدار.
+    out.runtimeVersion = process.env.SAHA_STORE === '1' ? { policy: 'appVersion' } : { policy: 'sdkVersion' };
   }
   return out;
 };
