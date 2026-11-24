@@ -60,6 +60,7 @@ if [ "${SAHA_EDGE_REMOVE:-}" = 1 ]; then
   if H test -e "$CONF"; then
     H rm -f "$CONF"
     H nginx -t >/dev/null 2>&1 && H nginx -s reload
+    sleep 2
     log "🧹 حذفت ملف ساحة $CONF وأعدت تحميل Nginx — المواقع الأخرى لم تُلمس. ساحة باقية على http://<IP>:8098."
   else
     log "لا يوجد ملف لساحة في Nginx — لا شيء لحذفه."

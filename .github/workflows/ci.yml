@@ -270,6 +270,7 @@ jobs:
           edge -e SAHA_UPSTREAM=127.0.0.1:8098 -e SAHA_EDGE_REMOVE=1 > /tmp/edge5.log 2>&1 || { cat /tmp/edge5.log; exit 1; }
           cat /tmp/edge5.log
           grep -q '🧹' /tmp/edge5.log
+          sleep 2
           test ! -e /etc/nginx/conf.d/saha-sslip.conf
           sudo nginx -t
           test "$(other http)" = khousousi-ok && test "$(other https)" = khousousi-tls
