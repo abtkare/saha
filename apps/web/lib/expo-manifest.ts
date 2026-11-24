@@ -55,7 +55,8 @@ export function buildManifest(built: Built, platform: string, origin: string) {
   const projectId: string | undefined = process.env.EXPO_PROJECT_ID || built.config.extra?.eas?.projectId || undefined;
   m.id = uuidFrom(`${platform}:${built.builtAt}:${origin}:${projectId ?? ''}:${process.env.EXPO_CI_MODE ?? ''}`);
   m.createdAt = built.builtAt;
-  m.launchAsset = { ...m.launchAsset, url: `${origin}/expo-app/${built.bundles[platform]}` };
+  // launchAsset يبقى بعنوان خادم التطوير نفسه (/index.bundle?platform=…): Expo Go يقرأ معاملات هذا العنوان،
+  // وبدونها يتوقف قبل تنزيل الحزمة (مُثبت في CI). المسار يقدّمه app/index.bundle/route.ts من الحزمة المحفوظة.
   m.extra.expoClient = {
     ...m.extra.expoClient,
     hostUri: host,
