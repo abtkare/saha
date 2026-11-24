@@ -7,6 +7,9 @@ import { AppError } from '../common/arabic-error.filter';
 import { AuthGuard } from '../auth/auth.guard';
 import type { AuthedRequest } from '../auth/auth.types';
 
+/** الحد الأعلى للإشعارات التجريبية خلال 10 دقائق */
+export const TEST_PUSH_LIMIT = 3;
+
 export interface NotificationInput { titleAr: string; bodyAr: string; data?: Prisma.InputJsonValue }
 
 /**
@@ -40,6 +43,21 @@ export class NotificationsService {
     return { ok: true };
   }
 
+  /**
+   * إشعار تجريبي للمستخدم نفسه (زر «أرسل إشعاراً تجريبياً» في حسابي) — يمر بنفس طريق كل الإشعارات:
+   * يُكتب في الجدول ثم ترسله مهمة Expo Push خلال ثوانٍ. حدّ: TEST_PUSH_LIMIT خلال 10 دقائق.
+   */
+  async sendTest(userId: number) {
+    const recent = await this.prisma.notification.count({
+      where: { userId, createdAt: { gt: new Date(Date.now() - 10 * 60_000) }, data: { path: ['type'], equals: 'test' } },
+    });
+    if (recent >= TEST_PUSH_LIMIT) throw new AppError(429, 'TEST_PUSH_LIMIT', 'أرسلت عدة إشعارات تجريبية للتو. حاول بعد 10 دقائق.');
+    const devices = await this.prisma.pushToken.count({ where: { userId, disabledAt: null } });
+    const time = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Baghdad', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date());
+    await this.notify([userId], { titleAr: 'إشعار تجريبي من ساحة', bodyAr: `وصلك هذا الإشعار الساعة ${time}. إشعارات الهاتف تعمل ✅`, data: { type: 'test' } });
+    return { ok: true, devices };
+  }
+
   async markAllRead(userId: number) {
     const r = await this.prisma.notification.updateMany({ where: { userId, readAt: null }, data: { readAt: new Date() } });
     return { ok: true, updated: r.count };
@@ -56,6 +74,12 @@ export class NotificationsController {
   list(@Req() req: AuthedRequest, @Query('unread') unread?: string, @Query('limit') limit?: string) {
     const n = Math.min(Math.max(Number(limit) || 30, 1), 100);
     return this.svc.list(req.auth.userId, unread === 'true', n);
+  }
+
+  /** POST /me/notifications/test — إشعار تجريبي لي (للتحقق من وصول إشعارات الهاتف) */
+  @Post('test') @HttpCode(200)
+  test(@Req() req: AuthedRequest) {
+    return this.svc.sendTest(req.auth.userId);
   }
 
   @Post('read-all') @HttpCode(200)

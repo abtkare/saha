@@ -1,0 +1,58 @@
+name: نشر التطبيق (EAS Update ← Expo Go)
+
+# ينشر حزمة التطبيق على خوادم Expo في مشروع «saha» بحساب appshoplive.
+# main ← القناة production (الرابط الدائم للمالك). فروع session-* ← القناة preview (للتجربة قبل الدمج).
+# يفتحها Expo Go على الآيفون بعد تسجيل الدخول فيه بنفس الحساب (شرط Expo منذ مايو 2026).
+on:
+  push:
+    branches: [main, "session-*"]
+    paths:
+      - "apps/mobile/**"
+      - "packages/shared/src/**"
+      - "packages/ui/src/**"
+      - ".github/workflows/app-update.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: app-update-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  update:
+    name: نشر نسخة جديدة
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      SAHA_EAS: "1"
+      SAHA_WEB_URL: ${{ vars.SAHA_WEB_URL || 'http://72.61.18.234:8098' }}
+      CHANNEL: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      PROJECT_ID: e971c618-1a3d-49f3-8c3d-ddf5bd31ce29
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: التحقق من السر EXPO_TOKEN
+        run: test -n "$EXPO_TOKEN" || { echo "::error title=EXPO_TOKEN::السر غير موجود في Settings ← Secrets and variables ← Actions"; exit 1; }
+      - name: تثبيت الحزم وأداة EAS
+        run: |
+          npm install --no-audit --no-fund
+          npm install -g eas-cli@latest --no-audit --no-fund
+          eas --version
+      - name: الحساب
+        run: eas whoami
+      - name: الإعداد المنشور
+        run: npx expo config --type public --json | node -e "const c=JSON.parse(require('fs').readFileSync(0));console.log(JSON.stringify({owner:c.owner,slug:c.slug,sdk:c.sdkVersion,runtime:c.runtimeVersion,updates:c.updates,extra:c.extra},null,1))"
+      - name: النشر
+        run: |
+          export SAHA_BUILD="$(TZ=Asia/Baghdad date '+%Y-%m-%d %H:%M') · ${GITHUB_SHA::7}"
+          msg="$(git log -1 --pretty=%s | head -c 120)"
+          eas update --branch "$CHANNEL" --message "$msg" --platform all --non-interactive --json > update.json || { cat update.json; exit 1; }
+          cat update.json
+      - name: رابط Expo Go
+        id: links
+        run: node scripts/eas-links.mjs update.json "$CHANNEL" "$PROJECT_ID"

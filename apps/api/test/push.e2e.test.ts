@@ -176,6 +176,29 @@ describe('الإرسال', () => {
     expect((await db.query(`SELECT disabled_at FROM push_tokens WHERE token = $1`, [tok('Dead')])).rows[0].disabled_at).toBeNull();
   });
 
+  it('زر «أرسل إشعاراً تجريبياً»: يصل لجهاز صاحبه فقط، ويعيد عدد أجهزته، وله حد', async () => {
+    expect((await api('POST', '/me/notifications/test')).status).toBe(401);
+    const before = sentTo(tok('Good')).length;
+    const r = await api('POST', '/me/notifications/test', undefined, a.token);
+    expect(r.status).toBe(200);
+    expect(r.body).toEqual({ ok: true, devices: 2 });
+    expect(await waitFor(() => sentTo(tok('Good')).length > before)).toBe(true);
+    const m = sentTo(tok('Good')).at(-1)!;
+    expect(m.title).toBe('إشعار تجريبي من ساحة');
+    expect(m.body).toMatch(/الساعة \d{2}:\d{2}/);
+    expect(m.data).toMatchObject({ type: 'test' });
+    expect(sentTo(tok('Bee')).filter((x) => x.title === 'إشعار تجريبي من ساحة')).toHaveLength(0);
+    // مستخدم بلا أجهزة: يُكتب الإشعار داخل التطبيق ويعرف أن جهازه غير مسجل
+    const c = await login('مستخدم بلا جهاز');
+    expect((await api('POST', '/me/notifications/test', undefined, c.token)).body.devices).toBe(0);
+    // الحد: 3 خلال 10 دقائق
+    for (let i = 0; i < 2; i++) expect((await api('POST', '/me/notifications/test', undefined, a.token)).status).toBe(200);
+    const lim = await api('POST', '/me/notifications/test', undefined, a.token);
+    expect(lim.status).toBe(429);
+    expect(lim.body.code).toBe('TEST_PUSH_LIMIT');
+    expect(await waitFor(() => sentTo(tok('Good')).length === before + 3)).toBe(true);
+  });
+
   it('الإشعار الأقدم من 30 دقيقة لا يُرسل للهاتف (يبقى داخل التطبيق)', async () => {
     const before = sentTo(tok('Good')).length;
     const id = await notifyDb(a.id, 'إشعار قديم', {}, '2 hours');

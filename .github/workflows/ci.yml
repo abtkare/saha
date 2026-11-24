@@ -168,6 +168,7 @@ jobs:
           curl -sf localhost:8098/admin > /dev/null
           # الجلسة 7: خادم التطبيق لـ Expo Go
           curl -sf localhost:8098/app | grep -q 'exp://localhost:8098/expo'
+          curl -sf localhost:8098/app | grep -q 'exp://u.expo.dev/e971c618-1a3d-49f3-8c3d-ddf5bd31ce29?runtime-version=exposdk%3A58.0.0&amp;channel-name=production'
           m=$(curl -sf -H 'expo-platform: ios' -H 'accept: application/expo+json,application/json' localhost:8098/expo)
           echo "$m" | head -c 600; echo
           echo "$m" | grep -q '"runtimeVersion":"exposdk:58'
@@ -181,6 +182,99 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' localhost:8098/matches/999999); test "$code" = 404
           curl -sf -X POST localhost:8098/api/v1/sponsor-leads -H 'content-type: application/json' \
             -d '{"fullName":"اختبار CI","phone":"07701234567","orgName":"شركة"}' | grep -q 'وصل طلبك'
+
+      - name: "الجلسة 8: النسخ الاحتياطي والاسترجاع (من ملف السيرفر نفسه)"
+        timeout-minutes: 6
+        run: |
+          set -x
+          # ملف السيرفر بعد الاستبدال ($$ ← $) — يثبت أيضاً أن الملف صالح
+          cp .env.example infra/.env
+          docker compose -f infra/docker-compose.stack.yml config --format json > /tmp/stack.json
+          node -e "const c=JSON.parse(require('fs').readFileSync('/tmp/stack.json'));process.stdout.write(c.services.backup.command[0].replace(/\\$\\$/g,'\$'))" > /tmp/backup.sh
+          rm infra/.env
+          # config يُبقي الهروب $$ في ناتجه (Compose يفكّه عند التشغيل فقط) — نفكّه هنا كما يفعل Compose
+          ! grep -F '$$' /tmp/backup.sh
+          grep -qF '${BACKUP_ONCE:-}' /tmp/backup.sh
+          sh -n /tmp/backup.sh
+          mkdir -p /tmp/bk
+          timeout 120 docker run --rm --network saha_net -e TZ=Asia/Baghdad -e PGHOST=saha-db -e POSTGRES_USER=saha \
+            -e POSTGRES_PASSWORD=saha_dev_only -e POSTGRES_DB=saha -e BACKUP_KEEP_DAYS=14 -e BACKUP_HOUR=03 -e BACKUP_ONCE=1 \
+            -v /tmp/bk:/backups -v /tmp/backup.sh:/backup.sh:ro postgres:16-alpine sh /backup.sh
+          f=$(ls /tmp/bk/saha-*.sql.gz | head -1); ls -la /tmp/bk; test -s "$f"
+          # الاسترجاع في قاعدة جديدة، ثم المقارنة وسلامة سجل التدقيق
+          q() { docker exec -i saha-db psql -U saha -v ON_ERROR_STOP=1 -At "$@"; }
+          q -d saha -c "CREATE DATABASE saha_restore"
+          gunzip -c "$f" | q -d saha_restore -q > /dev/null
+          for t in users tournaments teams matches audit_log hero_slides posts; do
+            a=$(q -d saha -c "SELECT count(*) FROM $t"); b=$(q -d saha_restore -c "SELECT count(*) FROM $t")
+            echo "$t: $a ← $b"; test "$a" = "$b"
+          done
+          test "$(q -d saha_restore -c 'SELECT count(*) FROM audit_log')" -gt 0
+          q -d saha_restore -c "SELECT ok, checked, reason FROM audit_verify()"
+          test "$(q -d saha_restore -c 'SELECT ok FROM audit_verify()')" = t
+          # الاسترجاع فوق قاعدة موجودة (حالة الطوارئ) يعمل أيضاً بفضل --clean
+          gunzip -c "$f" | q -d saha_restore -q > /dev/null
+          test "$(q -d saha_restore -c 'SELECT ok FROM audit_verify()')" = t
+
+      - name: "الجلسة 8: HTTPS عبر Nginx الموجود دون المساس بالمواقع الأخرى"
+        timeout-minutes: 10
+        run: |
+          set -x
+          command -v nginx || { sudo apt-get update -qq && sudo apt-get install -y -qq nginx; }
+          # موقع آخر يمثّل «خصوصي» على 80 و443 (كما على السيرفر)
+          sudo mkdir -p /etc/nginx/other && cd /etc/nginx/other
+          sudo openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj /CN=khousousi.test -keyout k.pem -out c.pem 2>/dev/null
+          printf '%s\n' 'server { listen 80; server_name khousousi.test; location / { return 200 "khousousi-ok"; } }' \
+            'server { listen 443 ssl; server_name khousousi.test; ssl_certificate /etc/nginx/other/c.pem; ssl_certificate_key /etc/nginx/other/k.pem; location / { return 200 "khousousi-tls"; } }' \
+            | sudo tee /etc/nginx/conf.d/khousousi.conf
+          cd -
+          sudo nginx -t && (sudo systemctl restart nginx || sudo nginx)
+          other() { curl -sk --resolve khousousi.test:80:127.0.0.1 --resolve khousousi.test:443:127.0.0.1 "$1://khousousi.test/"; }
+          test "$(other http)" = khousousi-ok && test "$(other https)" = khousousi-tls
+          D=saha.127-0-0-1.sslip.io
+          edge() { docker run --rm --privileged --pid=host --network=host -e SAHA_DOMAIN=$D -e SAHA_DIR=/tmp/saha-edge \
+            -e SAHA_ACME=selfsigned -e SAHA_EDGE_ONCE=1 "$@" --entrypoint bash ghcr.io/abtkare/saha-api:dev /repo/apps/api/ops/edge.sh; }
+          site() { curl -sk --resolve $D:443:127.0.0.1 --resolve $D:80:127.0.0.1 "$@"; }
+          # 1) أول تشغيل: إعداد HTTP ← شهادة ← HTTPS
+          edge -e SAHA_UPSTREAM=127.0.0.1:8098 > /tmp/edge1.log 2>&1 || { cat /tmp/edge1.log; exit 1; }
+          cat /tmp/edge1.log
+          grep -q '🎉' /tmp/edge1.log
+          # الموقع الآخر رُصد قبل التغيير وبعده بنفس الرمز
+          grep -q 'khousousi.test http=200 https=200' /tmp/edge1.log
+          site https://$D/api/v1/health | grep -q '"status":"ok"'
+          site https://$D/ | grep -q 'كل جمهور يستحق بطولته'
+          site https://$D/app | grep -q 'u.expo.dev'
+          test "$(site -o /dev/null -w '%{http_code}' http://$D/tournaments)" = 301
+          site -I https://$D/ | grep -qi strict-transport-security
+          test "$(other http)" = khousousi-ok && test "$(other https)" = khousousi-tls
+          # 2) إعادة التشغيل (زر Update) لا تغيّر شيئاً
+          edge -e SAHA_UPSTREAM=127.0.0.1:8098 > /tmp/edge2.log 2>&1 || { cat /tmp/edge2.log; exit 1; }
+          cat /tmp/edge2.log
+          grep -q 'لا تغيير' /tmp/edge2.log
+          # 3) إعداد خاطئ ← nginx -t يرفضه ← تراجع تلقائي وساحة والموقع الآخر يعملان كما كانا
+          if edge -e "SAHA_UPSTREAM=127.0.0.1:8098 broken" > /tmp/edge3.log 2>&1; then cat /tmp/edge3.log; echo "كان يجب أن يفشل"; exit 1; fi
+          cat /tmp/edge3.log
+          grep -q 'أعدت Nginx كما كان' /tmp/edge3.log
+          sudo nginx -t
+          site https://$D/api/v1/health | grep -q '"status":"ok"'
+          test "$(other http)" = khousousi-ok && test "$(other https)" = khousousi-tls
+          # 4) لا يكتب فوق ملف ليس من صنعه
+          sudo cp /etc/nginx/conf.d/saha-sslip.conf /tmp/saha-sslip.bak
+          echo '# ملف يدوي' | sudo tee /etc/nginx/conf.d/saha-sslip.conf >/dev/null
+          if edge -e SAHA_UPSTREAM=127.0.0.1:8098 > /tmp/edge4.log 2>&1; then cat /tmp/edge4.log; echo "كان يجب أن يرفض"; exit 1; fi
+          cat /tmp/edge4.log
+          grep -q 'ليس من صنع saha-edge' /tmp/edge4.log
+          test "$(cat /etc/nginx/conf.d/saha-sslip.conf)" = '# ملف يدوي'
+          sudo cp /tmp/saha-sslip.bak /etc/nginx/conf.d/saha-sslip.conf
+          # 5) مفتاح الطوارئ SAHA_EDGE_REMOVE=1: يحذف ملف ساحة وحده، والموقع الآخر يبقى
+          edge -e SAHA_UPSTREAM=127.0.0.1:8098 -e SAHA_EDGE_REMOVE=1 > /tmp/edge5.log 2>&1 || { cat /tmp/edge5.log; exit 1; }
+          cat /tmp/edge5.log
+          grep -q '🧹' /tmp/edge5.log
+          sleep 2
+          test ! -e /etc/nginx/conf.d/saha-sslip.conf
+          sudo nginx -t
+          test "$(other http)" = khousousi-ok && test "$(other https)" = khousousi-tls
+          test -z "$(site https://$D/ | grep 'كل جمهور يستحق بطولته' || true)"
 
       - name: لقطات المقارنة البصرية (المعاينة مقابل الموقع)
         run: |

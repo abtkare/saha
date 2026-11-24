@@ -1,6 +1,6 @@
 # ملف تسليم الجلسة — مشروع «ساحة»
 
-آخر تحديث: 2026-11-24 (الجلسة 7)
+آخر تحديث: 2026-11-25 (الجلسة 8)
 
 ## المشروع باختصار
 منصة «ساحة» (Saha) للبطولات الكروية: موقع + تطبيق + لوحة إدارة.
@@ -118,6 +118,15 @@
 
 > **⚠️ نتيجة التجربة على آيفون حقيقي (2026-11-24):** Expo Go وصل إلى `/expo` لكنه رفض الفتح برسالة «You need to be signed in to Expo Go and Expo CLI to open your project». السبب: على هاتف حقيقي وعبر الإنترنت (لا الشبكة المحلية) يشترط Expo Go أن يكون المشروع تابعاً لحساب Expo ومُوقَّعاً، وأن يكون المستخدم مسجلاً في Expo Go بنفس الحساب (المحاكي في CI يفتحه لأن العنوان محلي). **الحل في الجلسة 8 (أول مهمة):** نشر التطبيق بـ **EAS Update** من CI إلى حساب المالك في Expo، وفتحه في Expo Go بعد تسجيل الدخول فيه بنفس الحساب. يحتاج من المالك: حساب expo.dev مجاني، ومشروع `saha` (Project ID واسم الحساب)، و**Access Token** يُضاف في GitHub ← Settings ← Secrets and variables ← Actions باسم `EXPO_TOKEN`. نفس الحساب يفعّل إشعارات الهاتف أيضاً.
 
+## الجلسة 8 — النشر ⏳ (بدأت 2026-11-24، الفرع `session-8`، Pull Request رقم 9 — لم يُدمج بعد)
+- ✅ **EAS Update من CI:** `.github/workflows/app-update.yml` ينشر التطبيق إلى مشروع Expo «saha» (الحساب `appshoplive`، Project ID `e971c618-1a3d-49f3-8c3d-ddf5bd31ce29`، السر `EXPO_TOKEN` في GitHub). فرع `main` ← القناة `production`، فروع `session-*` ← القناة `preview`. الإعداد في `apps/mobile/app.config.js` (يُفعَّل بـ `SAHA_EAS=1`): owner وprojectId و`runtimeVersion: {policy: "sdkVersion"}` ← `exposdk:58.0.0` (**شرط Expo Go**؛ أول محاولة خرجت `0.7.0` ورُفضت). عنوان الموقع للتطبيق المنشور: `SAHA_WEB_URL` (حالياً `http://72.61.18.234:8098` — يُغيَّر إلى https بعد نجاح HTTPS). الروابط تُكتب في ملخص كل تشغيل (`scripts/eas-links.mjs`).
+- ✅ **(2026-11-25) المالك فتح التطبيق على آيفونه** في Expo Go (نسخة preview) بعد تسجيل الدخول بحساب appshoplive. ملاحظة: لصق رابط `exp://` في بحث Google لا يعمل؛ الطريقة: Expo Go ← Home ← Projects ← saha، أو https://expo.dev/accounts/appshoplive/projects/saha/updates ← Preview. صفحة `/app` في الموقع صار فيها زر لرابط القناة production (يعمل بعد الدمج).
+- ✅ **زر «أرسل إشعاراً تجريبياً»** في التطبيق (حسابي ← الإشعارات، يظهر بعد تفعيل إشعارات الهاتف): `POST /me/notifications/test` يكتب إشعاراً للمستخدم نفسه فترسله مهمة Expo Push خلال ثوانٍ، ويعيد عدد أجهزته (0 = الجهاز غير مسجل)، وحدّه 3 كل 10 دقائق. مختبر في `test/push.e2e.test.ts`.
+- ✅ **الإشعارات:** projectId صار موجوداً في التطبيق المنشور (`extra.eas.projectId`) فيأخذ رمز Expo Push. **يبقى التحقق على الهاتف** من وصول إشعار فعلي.
+- ⏳ **HTTPS — حاوية `saha-edge`** (`apps/api/ops/edge.sh` داخل صورة saha-api، وخدمة `edge` في `infra/docker-compose.stack.yml`): privileged + `pid: host` وتنفّذ على السيرفر عبر `nsenter`. تضيف ملف موقع واحداً `/etc/nginx/conf.d/saha-sslip.conf` (أو sites-enabled) للنطاق `saha.72-61-18-234.sslip.io` ← `127.0.0.1:8098`، شهادة Let's Encrypt بحاوية certbot (webroot) في `/docker/saha-stack/letsencrypt`، وتجديد كل 12 ساعة. تفحص كل المواقع الأخرى (خصوصي/مشاوي) قبل وبعد، وتتراجع تلقائياً إن فشل `nginx -t` أو تغيّر رمز أي موقع، ولا تكتب فوق ملف ليس من صنعها. اختبار CI (nginx حقيقي على المشغّل + موقع «khousousi.test» على 80 و443 + تراجع + عدم الكتابة فوق ملف يدوي). ✅ (2026-11-25) **أُصلح:** رصد المواقع الأخرى كان يقرأ `server_name` في أول السطر فقط فلم يرصد الموقع المكتوب في سطر واحد — صار يرصده في أي مكان مع تجاهل التعليقات، والاختبار يشترط ظهور `khousousi.test http=200 https=200` في السجل.
+- ⏳ **النسخ الاحتياطي — خدمة `backup`** (postgres:16-alpine): نسخة عند أول تشغيل ثم يومياً 03:00 بغداد في `/docker/saha-stack/backups/saha-*.sql.gz`، الاحتفاظ 14 يوماً، `pg_dump --clean --if-exists`. اختبار CI (نسخ ← استرجاع في قاعدة جديدة ← مقارنة الأعداد ← `audit_verify()` ← استرجاع ثانٍ فوقها). ✅ (2026-11-25) **أُصلح:** سبب التعليق كان في الاختبار لا في ملف السيرفر — `docker compose config` يُبقي الهروب `$$` في ناتجه (Compose يفكّه عند التشغيل فقط)، فصار `$$` رقم العملية، ولم يتحقق شرط `BACKUP_ONCE` فدخل السكربت حلقة اليوم الكامل. الاختبار يفكّ `$$` الآن كما يفعل Compose ويتحقق منه، ومهلة 120 ثانية. نجح: نسخ ← استرجاع ← تطابق الأعداد ← `audit_verify()` ← استرجاع ثانٍ فوقها.
+- ✅ **TestFlight مجهّز:** `apps/mobile/eas.json` (profile `production`، `SAHA_STORE=1`)، أيقونة `apps/mobile/assets/icon.png`، نصوص الأذونات بالعربية، و`.github/workflows/app-store.yml` يدوي (بناء EAS ثم `eas submit`). **ينتظر من المالك:** حساب Apple Developer (99$ سنوياً)، تطبيق في App Store Connect بالمعرّف `app.saha.iq`، والأسرار: `ASC_KEY_P8`، `ASC_KEY_ID`، `ASC_ISSUER_ID`، `APPLE_TEAM_ID`، `ASC_APP_ID`. لم يُجرَّب بعد (غير مؤكد أن EAS ينشئ شهادات iOS دون تفاعل بمفتاح ASC). نسخة المتجر تستخدم https فيجب أن ينجح HTTPS أولاً.
+
 ## خطوات معلّقة (بالترتيب)
 1. ✅ (2026-11-23) المالك فتح `http://72.61.18.234:8098/api/v1/health` من Safari على الآيفون ← `ok` (المنفذ 8098 مفتوح من الخارج). ✅ تحديث الجلسة 3 وصل عبر زر Update في Docker Manager: رابط `/api/v1/tournaments/baghdad-sahat-2026/scorers` يعيد `[]`.
 2. ✅ (2026-11-23) صور الجلسة 3 تعمل على السيرفر، والـ migration `0004` طُبّق.
@@ -139,8 +148,17 @@
     ~~أول دخول للوحة:~~ البريد `admin@saha.local` وكلمة السر = قيمة `ADMIN_INITIAL_PASSWORD` المحفوظة عندك من نص التشغيل ← فعّل التحقق الثنائي بالزر ← غيّر كلمة السر من «حسابي».
 13. ✅ الجلسة 7 — التطبيق (الكود جاهز ومختبر في الفرع `session-7`، Pull Request رقم 7).
 14. **دمج الجلسة 7 ثم تحديث السيرفر:** https://github.com/abtkare/saha/pull/7 ← **Merge pull request** ← **Confirm** ← انتظر نحو 10 دقائق (بناء الصور) ← Docker Manager ← `saha-stack` ← ⋮ ← **Update**. التحقق: ثبّت **Expo Go** من App Store، ثم افتح http://72.61.18.234:8098/app من Safari على الآيفون واضغط «افتح ساحة في Expo Go».
-15. **لتفعيل إشعارات الهاتف (مجاني، مرة واحدة):** حساب على https://expo.dev ← Create project باسم `saha` ← انسخ **Project ID** (بصيغة xxxxxxxx-xxxx-…) واسم الحساب، وأعطهما للجلسة القادمة لتضعهما في `apps/mobile/app.json` (لا حاجة لأي تعديل على السيرفر).
-16. **الجلسة 8 — النشر:** HTTPS برابط sslip.io، نسخ احتياطي يومي للقاعدة، ونسخة TestFlight.
+15. ✅ (2026-11-24) حساب Expo `appshoplive` ومشروع saha والسر EXPO_TOKEN جاهزة. ~~لتفعيل إشعارات الهاتف:~~ حساب على https://expo.dev ← Create project باسم `saha` ← انسخ **Project ID** (بصيغة xxxxxxxx-xxxx-…) واسم الحساب، وأعطهما للجلسة القادمة لتضعهما في `apps/mobile/app.json` (لا حاجة لأي تعديل على السيرفر).
+16. **الجلسة 8 — إكمال:** ✅ (أ) أُصلح اختبار النسخ الاحتياطي ونجح CI كاملاً في PR #9. (ب) دمج PR #9 ثم تشغيل HTTPS والنسخ الاحتياطي على السيرفر — **الخطوات في القسم «تشغيل HTTPS والنسخ الاحتياطي من Docker Manager» أدناه**. (ج) بعد نجاح HTTPS: متغير المستودع `SAHA_WEB_URL` = `https://saha.72-61-18-234.sslip.io` (GitHub ← Settings ← Secrets and variables ← Actions ← Variables) ثم إعادة تشغيل «نشر التطبيق» على main. (د) تجربة إشعار فعلي: حسابي ← فعّل إشعارات الهاتف ← «أرسل إشعاراً تجريبياً». (هـ) TestFlight بعد حساب Apple. (و) لاحقاً: ربط 8098 على 127.0.0.1 فقط بعد HTTPS (حتى لا يُزوَّر X-Forwarded-For عبر المنفذ المباشر) — ينتظر انتقال الآيفون كلياً إلى https.
+
+## تشغيل HTTPS والنسخ الاحتياطي من Docker Manager (بعد دمج PR #9 وانتهاء البناء)
+1. افتح الملف على GitHub: https://github.com/abtkare/saha/blob/main/infra/docker-compose.stack.yml ← زر النسخ (Copy raw file).
+2. هوستنجر ← VPS ← Manage ← Docker Manager ← Projects ← **`saha-stack`** (ليس `saha`) ← تعديل الملف ← امسح المحتوى والصق الجديد ← **Deploy**. لا تغيّر ملف `.env`.
+3. انتظر دقيقتين. يجب أن تظهر 6 حاويات: saha-db، saha-redis، saha-api، saha-web، **saha-backup**، **saha-edge**.
+4. سجل `saha-edge` (Logs): سطر «المواقع الأخرى قبل أي تغيير» بأسماء مواقع خصوصي ومشاوي ورموزها، ثم «✅ الشهادة جاهزة» ثم «🎉 ساحة على https://saha.72-61-18-234.sslip.io». إن ظهر ⛔ فلم يتغير شيء في المواقع الأخرى — انسخ السجل للجلسة.
+5. سجل `saha-backup`: «✅ نسخة احتياطية: /backups/saha-….sql.gz». الملفات في `/docker/saha-stack/backups` (مدير الملفات).
+6. من Safari: https://saha.72-61-18-234.sslip.io و https://saha.72-61-18-234.sslip.io/api/v1/health، **ثم افتح موقعي خصوصي ومشاوي** وتأكد أنهما يعملان.
+7. **طوارئ** (إن تأثر أي موقع آخر بعد ذلك لأي سبب): في نفس الملف غيّر `SAHA_EDGE_REMOVE: "0"` إلى `"1"` ← Deploy ← تحذف saha-edge ملف ساحة وحده من Nginx وتعيده كما كان. للرجوع: أعدها `"0"` ← Deploy.
 
 ## نص تشغيل ساحة الكاملة لوكيل هوستنجر (بعد جعل الحزمتين عامتين)
 ```text

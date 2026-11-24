@@ -1,0 +1,60 @@
+name: نسخة TestFlight (iOS)
+
+# يدوي فقط: GitHub ← Actions ← «نسخة TestFlight (iOS)» ← Run workflow.
+# يبني التطبيق على خوادم Expo (EAS Build) ويرفعه إلى App Store Connect فيظهر في TestFlight.
+# يحتاج حساب Apple Developer، وتطبيقاً منشأً في App Store Connect بالمعرّف app.saha.iq، وهذه الأسرار في
+# Settings ← Secrets and variables ← Actions:
+#   EXPO_TOKEN       (موجود)
+#   ASC_KEY_P8       محتوى ملف مفتاح App Store Connect API (.p8) كاملاً
+#   ASC_KEY_ID       معرّف المفتاح (Key ID)
+#   ASC_ISSUER_ID    Issuer ID
+#   APPLE_TEAM_ID    Team ID من developer.apple.com ← Membership
+#   ASC_APP_ID       Apple ID للتطبيق (رقم) من App Store Connect ← التطبيق ← App Information
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    name: بناء iOS ورفعه إلى TestFlight
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+      EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      EXPO_APPLE_TEAM_TYPE: INDIVIDUAL
+      ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+      EXPO_ASC_API_KEY_PATH: /tmp/asc.p8
+      SAHA_EAS: "1"
+      SAHA_STORE: "1"
+      SAHA_WEB_URL: https://saha.72-61-18-234.sslip.io
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: التحقق من الأسرار
+        run: |
+          miss=""
+          for v in EXPO_TOKEN ASC_KEY_P8 EXPO_ASC_KEY_ID EXPO_ASC_ISSUER_ID EXPO_APPLE_TEAM_ID ASC_APP_ID; do [ -n "${!v}" ] || miss="$miss $v"; done
+          [ -z "$miss" ] || { echo "::error title=أسرار ناقصة::$miss"; exit 1; }
+          printf '%s\n' "$ASC_KEY_P8" > "$EXPO_ASC_API_KEY_PATH"
+          node -e "const f='eas.json',j=JSON.parse(require('fs').readFileSync(f));j.submit.production.ios={ascAppId:process.env.ASC_APP_ID,appleTeamId:process.env.EXPO_APPLE_TEAM_ID,ascApiKeyPath:process.env.EXPO_ASC_API_KEY_PATH,ascApiKeyId:process.env.EXPO_ASC_KEY_ID,ascApiKeyIssuerId:process.env.EXPO_ASC_ISSUER_ID};require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+      - name: تثبيت الحزم وأداة EAS
+        run: |
+          npm install --no-audit --no-fund
+          npm install -g eas-cli@latest --no-audit --no-fund
+          eas whoami
+      - name: البناء على خوادم Expo (نحو 20–40 دقيقة)
+        run: eas build --platform ios --profile production --non-interactive --wait --json > build.json && cat build.json
+      - name: الرفع إلى App Store Connect ← TestFlight
+        run: |
+          id=$(node -e "const b=JSON.parse(require('fs').readFileSync('build.json'));process.stdout.write((Array.isArray(b)?b[0]:b).id)")
+          eas submit --platform ios --profile production --id "$id" --non-interactive
+          echo "## ✅ رُفعت النسخة إلى TestFlight — تظهر في تطبيق TestFlight بعد معالجة Apple (10–30 دقيقة)" >> "$GITHUB_STEP_SUMMARY"
