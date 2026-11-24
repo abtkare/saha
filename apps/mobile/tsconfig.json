@@ -2,7 +2,6 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "baseUrl": ".",
     "paths": {
       "@saha/shared": ["../../packages/shared/src/index.ts"],
       "@saha/ui": ["../../packages/ui/src/index.ts"]

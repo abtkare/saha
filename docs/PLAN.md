@@ -436,7 +436,7 @@ saha/
 | البطولات | `GET /tournaments` · `GET /tournaments/:id` · `GET /tournaments/:id/standings` (ومعه `groups`) · `GET /tournaments/:id/scorers` · `GET /tournaments/:id/draw` (التحقق من القرعة) · `POST /tournaments` · `PATCH /tournaments/:id` · `POST /tournaments/:id/status` · `GET/POST /tournaments/:id/registrations` · `POST …/registrations/:regId/decision` · `POST …/registrations/:regId/withdraw` · `PATCH …/registrations/:regId/fee` · `POST /tournaments/:id/draw` · `GET /tournaments/:id/fixtures` · `POST /tournaments/:id/schedule` · `POST /tournaments/:id/next-round` |
 | الفرق | `POST /teams` · `GET/PATCH /teams/:id` · `GET /me/teams` · `POST /teams/join` (رمز الانضمام) · `POST /me/children/:id/teams` · `POST /teams/:id/join-code` · `GET/POST /teams/:id/players` · `PATCH/DELETE /teams/:id/players/:playerId` · `GET/POST/PATCH /teams/:id/verification` |
 | المباريات | `GET /matches?date=` · `GET /matches/:id` (ومعه الأحداث وحالة التأكيد ومهلة الاعتراض) · `PATCH /matches/:id` (الموعد والملعب والحكم) · `POST /matches/:id/result` (الحكم، مع `sheetMediaId`) · `GET /matches/:id/sheet` (صورة الورقة لأطراف المباراة فقط) · `POST /matches/:id/events` · `DELETE /matches/:id/events/:eventId` · `POST /matches/:id/confirm` · `POST /matches/:id/disputes` · `GET /me/matches` (مباريات الحكم، ونتائج تنتظر تأكيد فرقي) |
-| الإشعارات | `GET /me/notifications?unread=` · `POST /me/notifications/:id/read` · `POST /me/notifications/read-all` |
+| الإشعارات | `GET /me/notifications?unread=` · `POST /me/notifications/:id/read` · `POST /me/notifications/read-all` · `POST /me/push-tokens {token, platform}` · `DELETE /me/push-tokens {token}` |
 | المحتوى (عام) | `GET /home/hero` (الشرائح الحيّة + `refreshSeconds: 30`) · `POST /hero/:id/events {type: impression\|click, deviceId}` · `GET /news?limit=` · `GET /news/:slug` · `GET /pages/:slug` · `POST /sponsor-leads` («كن راعياً») · `GET /media/:id` (صور المحتوى العامة) |
 | النتيجة النصية | `PATCH /matches/:id/live {text}` (حكم المباراة أو إدارة البطولة، يوم المباراة وقبل إدخال النتيجة) |
 | بوابة الراعي | `GET /sponsor/me` · `GET /sponsor/report?sponsorId=&from=&to=` · `GET /sponsor/report.csv` |
@@ -504,6 +504,21 @@ https://claude.ai/artifact/4yE5e1UHMKrKCDTAk2YCpD
 ```
 
 ## سجل التغييرات
+
+- **2026-11-24 — الجلسة 7 (التطبيق):** migration `0007_push`. **قرارات جديدة:**
+  - **Expo SDK 58** (React Native 0.88، React 19.3) — نسخة Expo Go الحالية في App Store تدعم SDK 58 فقط. التطبيق في `apps/mobile` **خارج مساحة pnpm** (يُثبَّت بـ npm وحده) ويقرأ `@saha/shared` و`@saha/ui` من مصدرهما عبر `metro.config.js`.
+  - **بلا مكتبة تنقّل:** خمسة تبويبات كما في تصميم «رئيسية التطبيق» (الرئيسية، البطولات، فريقي، الأخبار، حسابي) ولكل تبويب كومة شاشات (`src/nav.tsx`)، الشاشة تدخل من اليسار، والرجوع بالزر أو بالسحب من الحافة اليمنى أو زر أندرويد. السبب: واجهات expo-router تغيّرت في SDK 58 ولا نريد ربط التطبيق بها.
+  - **الاتجاه:** التطبيق عربي دائماً سواء كانت لغة الهاتف عربية أم لا (`row`/`right` في `src/theme.tsx`) دون `I18nManager.forceRTL` (لا يصلح داخل Expo Go).
+  - **الهوية:** الألوان من `@saha/ui` بالوضعين ونفس قيم `saha.css` (حالات النتيجة، الرأس، الجدول). الخطوط Cairo وIBM Plex Sans Arabic **تُحمَّل من الخادم** (`/expo-app/fonts`) لا من الحزمة، ومع تعذّرها خط النظام. شاشة البداية بنفس توقيتات الموقع (`components/splash.tsx`).
+  - **الوضع الداكن:** «حسب الهاتف» افتراضياً، أو فاتح/داكن من «حسابي» ويُحفظ.
+  - **التاريخ والوقت** بحساب ثابت +3 (العراق بلا توقيت صيفي) وأرقام 0–9، بدل `Intl` الذي يختلف بين محركات الجوال.
+  - **الرموز** في `expo-secure-store`، ونفس منطق التجديد في الموقع.
+  - **التشغيل على الآيفون عبر Expo Go بلا حساب Expo ولا خادم تطوير:** صورة الموقع تبني الحزمة (`expo export --no-bytecode`) وتقدّمها: `GET /expo` يعيد manifest بصيغة expo-updates (`runtimeVersion: exposdk:58.0.0`) فيه رابط الحزمة وعنوان الـ API من عنوان الطلب نفسه. الرابط المباشر `exp://<الخادم>/expo`، وصفحة `/app` فيها زر «افتح ساحة في Expo Go».
+  - **الروابط الداخلية:** `exp://…/expo/--/matches/12` (وبعد النشر `saha://matches/12`) تفتح الشاشة نفسها؛ نفس مسارات الموقع.
+  - **إشعارات الهاتف (Expo Push):** جدول `push_tokens` (رمز لكل جهاز، ينتقل لمن دخل أخيراً، 10 أجهزة للمستخدم) و`notifications.pushed_at`. `POST/DELETE /me/push-tokens`. مهمة خلفية كل `PUSH_SWEEP_SECONDS` (5 ثوانٍ) ترسل ما كُتب في `notifications` **بعد** اكتمال المعاملة، تحجز الإشعار قبل الإرسال فلا يتكرر، وتهمل الأقدم من 30 دقيقة (يبقى داخل التطبيق)، والشارة = عدد غير المقروء، والجهاز الذي يرد Expo بأنه غير مسجل يُعطَّل. `PUSH_PROVIDER=off` يوقفها.
+  - **إشعارات جديدة:** «مباراتك بعد قليل» قبل الانطلاق بساعة للحكم ومديري الفريقين ولاعبيهما وأولياء أمور القاصرين (مرة لكل موعد، `matches.reminder_sent_at` يُصفَّر عند تغيير الموعد)، وقرار تسجيل الفريق في البطولة، وقرار توثيق صفحة الفريق.
+  - **معرّف مشروع Expo مطلوب لإشعارات الهاتف فقط** (Expo Go يطلبه لإصدار رمز الجهاز): يُضاف في `apps/mobile/app.json` ← `extra.eas.projectId` (أو `EXPO_PROJECT_ID` للموقع). بدونه يعمل التطبيق كاملاً والإشعارات داخل التطبيق فقط.
+  - **CI:** وظيفة `mobile` (الأنواع، الاختبارات، البناء)، وفحص `/expo` في وظيفة التشغيل، وworkflow `app-ios.yml` يشغّل المنصة كاملة على macOS ويثبّت Expo Go على محاكي آيفون ويفتح الرابط ويلتقط كل الشاشات فاتحة وداكنة (الفرع `ci-shots-app`).
 
 - **2026-11-24 — الجلسة 6 (الموقع واللوحة):** لا migration جديد. **قرارات جديدة:**
   - **الوضع الداكن** صُمّم في المعاينة أولاً (`apps/preview/public/styles.css` + زر في الرأس) ثم نُسخ حرفياً إلى `saha.css`. الافتراضي فاتح، والداكن بزر في الرأس ويُحفظ في المتصفح (`saha_theme`) — لا تحويل تلقائي مع وضع الآيفون. الهيرو في الداكن أخضر أعمق (#0A5A41)، والشريط الداكن والتذييل #0A141C حتى لا ينقلبا فاتحين، والأزرار الخضراء بنص ليلي لأن الأبيض على #2FA37A ضعيف التباين.
