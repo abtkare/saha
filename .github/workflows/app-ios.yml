@@ -109,6 +109,21 @@ jobs:
       - name: فتح التطبيق والتقاط الشاشات
         run: node .github/scripts/app-shots.mjs app-shots --shots
 
+      - name: تجربة مقارنة — خادم Expo الرسمي بلا websocket
+        continue-on-error: true
+        run: |
+          (cd apps/mobile && nohup npx expo start --port 8081 --no-dev --minify > /tmp/metro.log 2>&1 &)
+          for i in $(seq 1 60); do curl -sf 127.0.0.1:8081/status && break; sleep 2; done
+          nohup node .github/scripts/log-proxy.mjs 8099 8081 > /tmp/proxy2.log 2>&1 &
+          sleep 2
+          xcrun simctl terminate "$UDID" host.exp.Exponent || true
+          xcrun simctl launch "$UDID" host.exp.Exponent; sleep 5
+          xcrun simctl openurl "$UDID" "exp://127.0.0.1:8099"; sleep 70
+          xcrun simctl io "$UDID" screenshot --type=png app-shots/x1-metro-no-websocket.png
+          cut -c1-220 /tmp/proxy2.log | head -30
+          echo "=== manifest خادم Expo"; curl -s -H 'expo-platform: ios' -H 'accept: application/expo+json' 127.0.0.1:8081 | head -c 2500; echo
+          echo "=== manifest ساحة"; curl -s -H 'expo-platform: ios' -H 'accept: application/expo+json' 127.0.0.1:8098/expo | head -c 2500; echo
+
       - name: السجلات
         if: always()
         run: |
