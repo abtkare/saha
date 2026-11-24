@@ -68,9 +68,20 @@ export function buildManifest(built: Built, platform: string, origin: string) {
     assets: meta.assets.map((a) => ({ key: path.basename(a.path), fileExtension: `.${a.ext}`, contentType: MIME[a.ext] ?? 'application/octet-stream', url: `${base}/${a.path}` })),
     metadata: {},
     extra: {
-      expoClient,
+      expoClient: { ...expoClient, hostUri: origin.replace(/^https?:\/\//, '') },
+      /*
+       * Expo Go يحمّل «النسخة المنشورة» (بلا expoGo) عبر قاعدة تحديثات خاصة تشترط خوادم Expo، فيرفض خادمنا.
+       * فنعلن الحزمة كما يعلنها خادم التطوير (expoGo + developer) لكن بحزمة إنتاج مبنية مسبقاً (dev: false):
+       * Expo Go يحمّل launchAsset مباشرة. مُختبَر على محاكي آيفون في .github/workflows/app-ios.yml.
+       */
+      expoGo: {
+        debuggerHost: origin.replace(/^https?:\/\//, ''),
+        developer: { tool: 'expo-cli', projectRoot: '/saha/apps/mobile' },
+        packagerOpts: { dev: false },
+        mainModuleName: 'index',
+      },
       scopeKey: owner ? `@${owner}/${slug}` : `@anonymous/${slug}-${createHash('sha256').update(origin).digest('hex').slice(0, 12)}`,
-      ...(projectId ? { eas: { projectId } } : {}),
+      eas: projectId ? { projectId } : {},
     },
   };
 }

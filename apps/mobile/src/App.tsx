@@ -9,6 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as Font from 'expo-font';
 import { setTokens } from './api';
 import { AuthProvider, useAuth } from './auth';
+import { Boundary } from './components/boundary';
 import { TabBar } from './components/layout';
 import { Splash } from './components/splash';
 import { CI_MODE, WEB_URL } from './config';
@@ -91,10 +92,10 @@ function Shell({ onTheme }: { onTheme: (t: 'light' | 'dark' | null) => void }) {
   const [splash, setSplash] = useState(true);
   const render = useCallback((tab: TabName, entries: { key: number; route: Route; closing?: boolean }[], close: (key: number) => void) => (
     <>
-      <TabRoot tab={tab} />
+      <Boundary><TabRoot tab={tab} /></Boundary>
       {entries.map((e) => (
         <StackCard key={e.key} closing={e.closing} onClosed={() => close(e.key)} bg={c.bg}>
-          <RouteScreen route={e.route} />
+          <Boundary><RouteScreen route={e.route} /></Boundary>
         </StackCard>
       ))}
     </>

@@ -59,7 +59,7 @@ const q = (theme, t) => [`theme=${theme}`, t ? `ci_access=${encodeURIComponent(t
 // Expo Go في المقدمة أولاً، حتى لا يسأل النظام «Open in Expo Go?» عند فتح الرابط
 sim('launch', 'booted', 'host.exp.Exponent');
 await shot('00a-expo-go', 10000);
-sim('openurl', 'booted', `${EXP}?__expo_disable_onboarding=1`);
+sim('openurl', 'booted', `${EXP}?__expo_disable_onboarding=1&__expo_disable_fab=1&__expo_disable_auto_launch=1`);
 await shot('00-launch-splash', 3500);
 await shot('01-home-light', 30000);
 

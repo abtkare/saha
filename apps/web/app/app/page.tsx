@@ -20,6 +20,8 @@ export default async function AppPage() {
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
   const https = (h.get('x-forwarded-proto') ?? 'http').startsWith('https');
   const expoUrl = `${https ? 'exps' : 'exp'}://${host}/expo`;
+  // تخفي نافذة التعريف وزر أدوات المطوّر في Expo Go
+  const openUrl = `${expoUrl}?__expo_disable_onboarding=1&__expo_disable_fab=1&__expo_disable_auto_launch=1`;
   return (
     <>
       <PageHero title="تطبيق ساحة" text="التطبيق هو مكان الفرق والحكام: التسجيل وإدارة اللاعبين وتأكيد النتائج. قريباً على App Store وGoogle Play." />
@@ -30,7 +32,7 @@ export default async function AppPage() {
             <li>ثبّت تطبيق <b>Expo Go</b> المجاني: <a href={EXPO_GO_IOS}>App Store</a> · <a href={EXPO_GO_ANDROID}>Google Play</a></li>
             <li>افتح هذه الصفحة على الهاتف نفسه، واضغط الزر:</li>
           </ol>
-          <a className="btn btn-primary" href={expoUrl} id="open-expo">افتح «ساحة» في Expo Go</a>
+          <a className="btn btn-primary" href={openUrl} id="open-expo">افتح «ساحة» في Expo Go</a>
           <p className="muted">أو انسخ الرابط والصقه في Safari: <code dir="ltr">{expoUrl}</code></p>
         </div>
       </section>
