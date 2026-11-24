@@ -184,7 +184,9 @@ jobs:
             -d '{"fullName":"اختبار CI","phone":"07701234567","orgName":"شركة"}' | grep -q 'وصل طلبك'
 
       - name: "الجلسة 8: النسخ الاحتياطي والاسترجاع (من ملف السيرفر نفسه)"
+        timeout-minutes: 6
         run: |
+          set -x
           # ملف السيرفر بعد الاستبدال ($$ ← $) — يثبت أيضاً أن الملف صالح
           cp .env.example infra/.env
           docker compose -f infra/docker-compose.stack.yml config --format json > /tmp/stack.json
@@ -211,6 +213,7 @@ jobs:
           test "$(q -d saha_restore -c 'SELECT ok FROM audit_verify()')" = t
 
       - name: "الجلسة 8: HTTPS عبر Nginx الموجود دون المساس بالمواقع الأخرى"
+        timeout-minutes: 10
         run: |
           set -x
           command -v nginx || { sudo apt-get update -qq && sudo apt-get install -y -qq nginx; }
