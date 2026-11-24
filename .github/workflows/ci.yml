@@ -219,7 +219,7 @@ jobs:
       - name: "الجلسة 8: HTTPS عبر Nginx الموجود دون المساس بالمواقع الأخرى"
         timeout-minutes: 10
         run: |
-          set -x
+          set -x -o pipefail   # حتى يُحسب فشل edge.sh لا نجاح tee في «edge … | tee»
           command -v nginx || { sudo apt-get update -qq && sudo apt-get install -y -qq nginx; }
           # موقع آخر يمثّل «خصوصي» على 80 و443 (كما على السيرفر)
           sudo mkdir -p /etc/nginx/other && cd /etc/nginx/other
