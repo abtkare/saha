@@ -141,7 +141,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
 }
 
 const styles = StyleSheet.create({
-  center: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 24, paddingBottom: 40 },
+  center: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 24, paddingBottom: 40 },
   word: { color: '#FFFFFF', fontSize: 64, lineHeight: 76, textAlign: 'center' },
   tag: { color: '#FFFFFF', fontSize: 17, marginTop: 6, textAlign: 'center', writingDirection: 'rtl' },
   chips: { flexDirection: row, flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 18 },

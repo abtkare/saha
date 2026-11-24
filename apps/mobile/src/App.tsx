@@ -65,7 +65,7 @@ function Links({ onTheme }: { onTheme: (t: 'light' | 'dark' | null) => void }) {
   const { openPath, pop } = useNav();
   const { reload } = useAuth();
   useEffect(() => {
-    const handle = async (url: string | null) => {
+    const handle = async (url: string | null | undefined) => {
       if (!url) return;
       const l = linkPath(url);
       if (!l) return;
