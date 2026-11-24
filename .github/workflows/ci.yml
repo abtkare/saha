@@ -192,6 +192,8 @@ jobs:
           docker compose -f infra/docker-compose.stack.yml config --format json > /tmp/stack.json
           node -e "const c=JSON.parse(require('fs').readFileSync('/tmp/stack.json'));process.stdout.write(c.services.backup.command[0].replace(/\\$\\$/g,'\$'))" > /tmp/backup.sh
           rm infra/.env
+          # الملف داخل الصورة مطابق للمستودع (منه يأخذه وكيل هوستنجر)
+          docker run --rm --entrypoint cat ghcr.io/abtkare/saha-api:dev /repo/infra/docker-compose.stack.yml | cmp - infra/docker-compose.stack.yml
           # config يُبقي الهروب $$ في ناتجه (Compose يفكّه عند التشغيل فقط) — نفكّه هنا كما يفعل Compose
           ! grep -F '$$' /tmp/backup.sh
           grep -qF '${BACKUP_ONCE:-}' /tmp/backup.sh

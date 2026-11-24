@@ -14,6 +14,8 @@ RUN pnpm --filter @saha/shared build && pnpm --filter @saha/api build
 FROM base AS run
 ENV NODE_ENV=production TZ=Asia/Baghdad PORT=3001
 COPY --from=build /repo /repo
+# ملف تشغيل السيرفر داخل الصورة: وكيل هوستنجر يأخذه بأمر قصير واحد (المستودع خاص ونصّه الطويل يُقتطع عند لصقه)
+COPY infra/docker-compose.stack.yml /repo/infra/docker-compose.stack.yml
 WORKDIR /repo/apps/api
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s CMD node -e "fetch('http://127.0.0.1:3001/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
