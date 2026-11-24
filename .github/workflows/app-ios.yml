@@ -114,19 +114,20 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p app-shots
-          (cd apps/mobile && nohup npx expo start --port 8081 > /tmp/metro.log 2>&1 &)
+          (cd apps/mobile && nohup npx expo start --port 8081 --no-dev --minify > /tmp/metro.log 2>&1 &)
           for i in $(seq 1 60); do curl -sf 127.0.0.1:8081/status && break; sleep 2; done
-          echo "=== manifest خادم التطوير"; curl -s -H 'expo-platform: ios' -H 'accept: multipart/mixed,application/expo+json,application/json' -D - 127.0.0.1:8081 | head -c 4000; echo
-          echo "=== manifest ساحة"; curl -s -H 'expo-platform: ios' -H 'accept: multipart/mixed,application/expo+json,application/json' -D - 127.0.0.1:8098/expo | head -c 4000; echo
           xcrun simctl launch "$UDID" host.exp.Exponent; sleep 6
-          xcrun simctl openurl "$UDID" "exp://127.0.0.1:8098/expo"; sleep 20
+          xcrun simctl spawn "$UDID" log stream --level debug --style compact --predicate 'process == "Expo Go"' > /tmp/expogo.log 2>&1 &
+          LP=$!
+          xcrun simctl openurl "$UDID" "exp://127.0.0.1:8098/expo"; sleep 25
           xcrun simctl io "$UDID" screenshot --type=png app-shots/d1-ours.png
-          echo "=== سجل Expo Go"; xcrun simctl spawn "$UDID" log show --last 2m --style compact --predicate 'process CONTAINS "Expo" OR processImagePath CONTAINS "Exponent"' 2>/dev/null | grep -iE "error|exception|fatal|manifest|update|crash|terminat" | tail -80 || true
-          echo "=== تقارير الأعطال"; ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head; f=$(ls -t ~/Library/Logs/DiagnosticReports/*Expo* ~/Library/Logs/DiagnosticReports/*Exponent* 2>/dev/null | head -1); [ -n "$f" ] && head -c 6000 "$f"
+          kill $LP || true
+          echo "=== سجل Expo Go (ساحة)"; grep -aiE "javascript|fatal|exception|unhandled|error|bundle|8098|manifest|crash|abort|signal|launch" /tmp/expogo.log | grep -viE "nw_|BoardServices|UIKit|storekit|Crashlytics\] Version" | cut -c1-600 | head -120
+          echo "=== تقارير الأعطال"; find ~/Library/Logs/DiagnosticReports -newer /tmp/metro.log -type f 2>/dev/null | head; f=$(find ~/Library/Logs/DiagnosticReports -newer /tmp/metro.log -type f -iname "*expo*" 2>/dev/null | head -1); [ -n "$f" ] && head -c 8000 "$f"
           xcrun simctl launch "$UDID" host.exp.Exponent; sleep 4
           xcrun simctl openurl "$UDID" "exp://127.0.0.1:8081"; sleep 60
-          xcrun simctl io "$UDID" screenshot --type=png app-shots/d2-devserver.png
-          tail -30 /tmp/metro.log
+          xcrun simctl io "$UDID" screenshot --type=png app-shots/d2-devserver-prod.png
+          tail -20 /tmp/metro.log
           xcrun simctl terminate "$UDID" host.exp.Exponent || true
 
       - name: فتح التطبيق والتقاط الشاشات
