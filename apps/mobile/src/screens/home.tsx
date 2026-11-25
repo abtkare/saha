@@ -2,14 +2,14 @@
 import { useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { api } from '../api';
-import { FeaturedFallback, HeroSlider, MatchCard, NewsRow, StandingsTable, TourCard } from '../components/cards';
+import { FeaturedFallback, HeroSlider, SponsorBanners, MatchCard, NewsRow, StandingsTable, TourCard } from '../components/cards';
 import { BrandHeader } from '../components/layout';
 import { Empty, ErrorBox, Loading, ScrollPage, Section, Tabs } from '../components/ui';
 import { baghdadDate } from '../format';
 import { useLoad } from '../hooks';
 import { useNav } from '../nav';
 import { invertHorizontal, useTheme } from '../theme';
-import type { Hero, MatchItem, NewsItem, Standings, TournamentSummary } from '../types';
+import type { Banner, Hero, MatchItem, NewsItem, Standings, TournamentSummary } from '../types';
 
 type Day = 'y' | 't' | 'm';
 const DAY_TABS: { key: Day; label: string }[] = [{ key: 'y', label: 'أمس' }, { key: 't', label: 'اليوم' }, { key: 'm', label: 'غداً' }];
@@ -35,6 +35,7 @@ export function HomeScreen() {
     return { days: { y, t, m } as Record<Day, MatchItem[]>, tours: live, standings, news };
   });
   const hero = useLoad(() => api<Hero>('/home/hero').catch(() => null), []);
+  const banners = useLoad(() => api<{ banners: Banner[] }>('/home/banners').then((r) => r.banners).catch(() => null), []);
 
   const d = page.data;
   const heroData = hero.data;
@@ -45,7 +46,7 @@ export function HomeScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <BrandHeader />
-      <ScrollPage onRefresh={() => { page.refresh(); void hero.reload(); }} refreshing={page.refreshing}>
+      <ScrollPage onRefresh={() => { page.refresh(); void hero.reload(); void banners.reload(); }} refreshing={page.refreshing}>
         {page.loading && !d ? <Loading /> : page.error && !d ? (
           <View style={{ padding: 16 }}><ErrorBox message={page.error} onRetry={page.refresh} /></View>
         ) : d ? (
@@ -53,6 +54,8 @@ export function HomeScreen() {
             <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
               {heroData && heroData.slides.length ? <HeroSlider hero={heroData} onRefresh={() => void hero.reload()} /> : featured ? <FeaturedFallback m={featured} /> : null}
             </View>
+
+            {!!banners.data?.length && <View style={{ paddingHorizontal: 16, paddingTop: 16 }}><SponsorBanners banners={banners.data} /></View>}
 
             <Section title={title} action="البطولات" onAction={() => goTab('tournaments')}>
               <Tabs items={DAY_TABS} value={day} onChange={setDay} />

@@ -595,3 +595,57 @@ describe('الجلسة 5 — «كن راعياً» وسجل التدقيق', () 
     expect(v.body.ok, JSON.stringify(v.body)).toBe(true);
   });
 });
+
+describe('الجلسة 14 — الراعي الدائم', () => {
+  const made: number[] = [];
+  afterAll(async () => { if (made.length) await db.query(`DELETE FROM sponsor_banners WHERE id = ANY($1)`, [made]); });
+
+  it('الراعي الدائم الأول (جمعية الميثاق الأعظم) مضاف مع الـ migration ويظهر للعامة', async () => {
+    const r = await api('GET', '/home/banners');
+    expect(r.status).toBe(200);
+    const gca = (r.body.banners as any[]).find((b) => b.imageUrl === '/sponsors/gca-diamond.webp');
+    expect(gca, JSON.stringify(r.body)).toBeTruthy();
+    expect(gca.linkUrl).toBe('https://grandcovenantiq.online');
+    expect(gca.sponsor.nameAr).toContain('الميثاق الأعظم');
+  });
+
+  it('مدير الرعاة يضيف لوحة ويغيّر صورتها ويخفيها ويحذفها؛ وغيره ممنوع', async () => {
+    const img = await upload(PNG(), sponsorMgr.token, 'content');
+    expect(img.status, JSON.stringify(img.body)).toBe(201);
+    expect((await api('POST', '/admin/banners', { labelAr: 'لوحة', imageMediaId: img.body.id }, editor.token)).status).toBe(403);
+    expect((await api('GET', '/admin/banners', undefined, outsider.token)).status).toBe(403);
+    // صورة لم يرفعها هو
+    const other = await upload(PNG(), editor.token, 'content');
+    expect((await api('POST', '/admin/banners', { labelAr: 'لوحة', imageMediaId: other.body.id }, sponsorMgr.token)).body.code).toBe('MEDIA_INVALID');
+    expect((await api('POST', '/admin/banners', { labelAr: 'لوحة', imageMediaId: img.body.id, linkUrl: 'javascript:alert(1)' }, sponsorMgr.token)).body.code).toBe('INVALID_LINK');
+
+    const c = await api('POST', '/admin/banners', { labelAr: `راعٍ دائم ${run}`, imageMediaId: img.body.id, linkUrl: 'https://example.iq', sponsorId: sponsorA, sortOrder: 5 }, sponsorMgr.token);
+    expect(c.status, JSON.stringify(c.body)).toBe(201);
+    made.push(c.body.id);
+    expect(c.body.imageUrl).toBe(`/api/v1/media/${img.body.id}`);
+    let pub = (await api('GET', '/home/banners')).body.banners as any[];
+    expect(pub.map((b) => b.id)).toContain(c.body.id);
+
+    // تغيير الصورة من اللوحة
+    const img2 = await upload(PNG(), sponsorMgr.token, 'content');
+    const u = await api('PATCH', `/admin/banners/${c.body.id}`, { imageMediaId: img2.body.id }, sponsorMgr.token);
+    expect(u.body.imageUrl).toBe(`/api/v1/media/${img2.body.id}`);
+    pub = (await api('GET', '/home/banners')).body.banners as any[];
+    expect(pub.find((b) => b.id === c.body.id).imageUrl).toBe(`/api/v1/media/${img2.body.id}`);
+
+    // إخفاء ثم إظهار
+    expect((await api('PATCH', `/admin/banners/${c.body.id}`, { isActive: false }, sponsorMgr.token)).body.isActive).toBe(false);
+    pub = (await api('GET', '/home/banners')).body.banners as any[];
+    expect(pub.map((b) => b.id)).not.toContain(c.body.id);
+    expect((await api('PATCH', `/admin/banners/${c.body.id}`, {}, sponsorMgr.token)).body.code).toBe('NOTHING_TO_UPDATE');
+
+    // القاعدة نفسها ترفض صورة من خارج الموقع
+    await expect(db.query(`UPDATE sponsor_banners SET image_url = 'https://evil.example/x.png' WHERE id = $1`, [c.body.id])).rejects.toThrow();
+
+    const d = await api('DELETE', `/admin/banners/${c.body.id}`, undefined, admin.token);
+    expect(d.body.deleted).toBe(true);
+    expect((await api('PATCH', `/admin/banners/${c.body.id}`, { isActive: true }, sponsorMgr.token)).status).toBe(404);
+    const a = await db.query(`SELECT DISTINCT action FROM audit_log WHERE entity = 'sponsor_banner' AND entity_id = $1`, [String(c.body.id)]);
+    expect(a.rows.map((x) => x.action).sort()).toEqual(['banner.create', 'banner.delete', 'banner.update']);
+  });
+});

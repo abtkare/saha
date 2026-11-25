@@ -91,6 +91,9 @@ export interface HeroSlide {
 }
 export interface Hero { refreshSeconds: number; slides: HeroSlide[] }
 
+/** لوحة الراعي الدائم — GET /home/banners (الجلسة 14) */
+export interface Banner { id: number; labelAr: string; imageUrl: string; linkUrl: string | null; sponsor: { id: number; nameAr: string } | null }
+
 export interface Me {
   id: number; fullName: string; phone: string | null; email: string | null; birthYear: number | null; status: string;
   guardianId: number | null; mfa: boolean; totpEnabled: boolean;

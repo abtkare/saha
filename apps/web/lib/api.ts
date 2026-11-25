@@ -81,6 +81,9 @@ export interface HeroSlide {
 }
 export interface Hero { refreshSeconds: number; slides: HeroSlide[] }
 
+/** لوحة الراعي الدائم — GET /home/banners */
+export interface Banner { id: number; labelAr: string; imageUrl: string; linkUrl: string | null; sponsor: { id: number; nameAr: string } | null }
+
 export async function apiGet<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(`${API}/api/v1${path}`, { cache: 'no-store' });

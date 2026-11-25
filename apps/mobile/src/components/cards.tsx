@@ -8,7 +8,7 @@ import { useInterval } from '../hooks';
 import { useNav } from '../nav';
 import { radius, row, T, useTheme } from '../theme';
 import { kickoffDay, kickoffTime, relativeTime, scoreText, shortDate, signed } from '../format';
-import type { Hero, HeroSlide, MatchItem, NewsItem, StandingRow, TeamRef, TournamentSummary, Zone } from '../types';
+import type { Banner, Hero, HeroSlide, MatchItem, NewsItem, StandingRow, TeamRef, TournamentSummary, Zone } from '../types';
 import { Icon, Mark, PitchLines } from './icons';
 import { Avatar, Card, Chip, Crest, Progress, StatusBadge } from './ui';
 
@@ -342,3 +342,36 @@ export function FeaturedFallback({ m }: { m: MatchItem }) {
   );
 }
 
+
+/** الراعي الدائم (الجلسة 14): لوحة ثابتة بعرض الشاشة، لا تدور مع السلايدر؛ صورتها تُغيَّر من لوحة الإدارة */
+export function SponsorBanners({ banners }: { banners: Banner[] | null | undefined }) {
+  if (!banners?.length) return null;
+  return <View style={{ gap: 12 }}>{banners.map((b) => <BannerCard key={b.id} b={b} />)}</View>;
+}
+
+function BannerCard({ b }: { b: Banner }) {
+  const { c } = useTheme();
+  const { openPath } = useNav();
+  const [ratio, setRatio] = useState(16 / 9);
+  const open = () => {
+    const href = b.linkUrl;
+    if (!href) return;
+    if (/^https?:/.test(href)) {
+      const local = href.replace(/^https?:\/\/[^/]+/, '');
+      if (href.startsWith(WEB_URL) && openPath(local)) return;
+      void Linking.openURL(href);
+    } else openPath(href);
+  };
+  return (
+    <Pressable
+      onPress={open} disabled={!b.linkUrl} accessibilityRole={b.linkUrl ? 'link' : 'image'} accessibilityLabel={b.labelAr}
+      style={({ pressed }) => ({ borderRadius: radius.md, overflow: 'hidden', backgroundColor: '#0E1A24', borderWidth: 1, borderColor: c.border, opacity: pressed ? 0.9 : 1 })}
+    >
+      <Image
+        source={{ uri: absolute(b.imageUrl) }} resizeMode="contain" accessibilityIgnoresInvertColors
+        style={{ width: '100%', aspectRatio: ratio }}
+        onLoad={(e) => { const s = e.nativeEvent.source; if (s?.width && s?.height) setRatio(Math.max(1, Math.min(4, s.width / s.height))); }}
+      />
+    </Pressable>
+  );
+}

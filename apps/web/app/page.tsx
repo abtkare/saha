@@ -1,23 +1,25 @@
 import { TOURNAMENT_KINDS, TOURNAMENT_KIND_LABELS } from '@saha/shared';
-import { apiGet, type Hero, type MatchItem, type NewsItem, type Standings, type TournamentSummary } from '@/lib/api';
+import { apiGet, type Banner, type Hero, type MatchItem, type NewsItem, type Standings, type TournamentSummary } from '@/lib/api';
 import { baghdadDate, pickFeatured } from '@/lib/format';
 import { EmptyCard, NewsCard, StandingsTable, TourCard } from '@/components/cards';
 import { HeroSlider } from '@/components/hero-slider';
 import { MatchTabs } from '@/components/match-tabs';
 import { PitchLines } from '@/components/mark';
 import { AppBand } from '@/components/app-band';
+import { SponsorBanners } from '@/components/sponsor-banners';
 
 export const dynamic = 'force-dynamic';
 
 /** الرئيسية — نقل حرفي لـ apps/preview/public/index.html مع بيانات الـ API */
 export default async function Home() {
-  const [yesterday, today, tomorrow, tournaments, news, hero] = await Promise.all([
+  const [yesterday, today, tomorrow, tournaments, news, hero, banners] = await Promise.all([
     apiGet<MatchItem[]>(`/matches?date=${baghdadDate(-1)}`),
     apiGet<MatchItem[]>(`/matches?date=${baghdadDate(0)}`),
     apiGet<MatchItem[]>(`/matches?date=${baghdadDate(1)}`),
     apiGet<TournamentSummary[]>('/tournaments'),
     apiGet<NewsItem[]>('/news?limit=3'),
     apiGet<Hero>('/home/hero'),
+    apiGet<{ banners: Banner[] }>('/home/banners'),
   ]);
   const days = [yesterday ?? [], today ?? [], tomorrow ?? []];
   const featured = pickFeatured(days[0], days[1], days[2]);
@@ -43,6 +45,8 @@ export default async function Home() {
           <HeroSlider initialHero={hero} fallback={featured} />
         </div>
       </section>
+
+      <SponsorBanners banners={banners?.banners} />
 
       <MatchTabs days={days} failed={today === null} />
 
