@@ -93,10 +93,10 @@ const MATCH_H = 84;
 
 /** الشجرة: عمود لكل دور، الدور الأول يميناً والنهائي يساراً، والمباريات موزعة لتلتقي أزواجها في الدور التالي */
 function Bracket({ rounds }: { rounds: Road['bracket'] }) {
-  const ref = useRef<ScrollView>(null);
+  const ref = useRef<{ scrollToEnd: (o?: { animated?: boolean }) => void } | null>(null);
   const height = Math.max(1, rounds[0].matches.length) * (MATCH_H + 16);
   return (
-    <ScrollView ref={ref} horizontal showsHorizontalScrollIndicator={false}
+    <ScrollView ref={ref as never} horizontal showsHorizontalScrollIndicator={false}
       onContentSizeChange={() => { if (row === 'row-reverse') ref.current?.scrollToEnd({ animated: false }); }}
       contentContainerStyle={{ flexDirection: row, gap: 12, paddingVertical: 4 }}>
       {rounds.map((r) => (
