@@ -183,26 +183,38 @@ jobs:
           curl -sf -X POST localhost:8098/api/v1/sponsor-leads -H 'content-type: application/json' \
             -d '{"fullName":"اختبار CI","phone":"07701234567","orgName":"شركة"}' | grep -q 'وصل طلبك'
 
-      - name: "الجلسة 8: النسخ الاحتياطي والاسترجاع (من ملف السيرفر نفسه)"
+      - name: "الجلسة 8/9: مشروع saha-ops — النسخ الاحتياطي والاسترجاع (من ملف السيرفر نفسه وبنفس مساراته)"
         timeout-minutes: 6
         run: |
           set -x
-          # ملف السيرفر بعد الاستبدال ($$ ← $) — يثبت أيضاً أن الملف صالح
+          # ملف التشغيل الرئيسي: أربع خدمات فقط (backup وedge في saha-ops حتى لا تتكرر الأسماء)
           cp .env.example infra/.env
-          docker compose -f infra/docker-compose.stack.yml config --format json > /tmp/stack.json
-          node -e "const c=JSON.parse(require('fs').readFileSync('/tmp/stack.json'));process.stdout.write(c.services.backup.command[0].replace(/\\$\\$/g,'\$'))" > /tmp/backup.sh
+          test "$(docker compose -f infra/docker-compose.stack.yml config --services | sort | tr '\n' ' ')" = "api db redis web "
           rm infra/.env
-          # الملف داخل الصورة مطابق للمستودع (منه يأخذه وكيل هوستنجر)
           docker run --rm --entrypoint cat ghcr.io/abtkare/saha-api:dev /repo/infra/docker-compose.stack.yml | cmp - infra/docker-compose.stack.yml
-          # config يُبقي الهروب $$ في ناتجه (Compose يفكّه عند التشغيل فقط) — نفكّه هنا كما يفعل Compose
+          # الرابط العام لزر Compose from URL: الموقع يقدّم الملف حرفياً، ونسخة الطوارئ تختلف في سطر واحد فقط
+          curl -sf localhost:8098/ops/saha-ops.yml | cmp - infra/docker-compose.ops.yml
+          curl -sf localhost:8098/ops/saha-ops-remove.yml > /tmp/remove.yml
+          test "$(diff infra/docker-compose.ops.yml /tmp/remove.yml | grep -c '^[<>]')" = 2
+          grep -q 'SAHA_EDGE_REMOVE: "1"' /tmp/remove.yml
+          # نفس مسارات السيرفر: /docker/saha-stack/.env و/docker/saha-stack/backups
+          sudo mkdir -p /docker/saha-stack/backups
+          printf '%s\n' POSTGRES_USER=saha POSTGRES_DB=saha POSTGRES_PASSWORD=saha_dev_only | sudo tee /docker/saha-stack/.env >/dev/null
+          test "$(docker compose -f infra/docker-compose.ops.yml config --services | sort | tr '\n' ' ')" = "backup edge "
+          docker compose -f infra/docker-compose.ops.yml config --format json > /tmp/ops.json
+          node -e "const c=JSON.parse(require('fs').readFileSync('/tmp/ops.json'));process.stdout.write(c.services.backup.command[0].replace(/\\$\\$/g,'\$'))" > /tmp/backup.sh
           ! grep -F '$$' /tmp/backup.sh
           grep -qF '${BACKUP_ONCE:-}' /tmp/backup.sh
           sh -n /tmp/backup.sh
-          mkdir -p /tmp/bk
-          timeout 120 docker run --rm --network saha_net -e TZ=Asia/Baghdad -e PGHOST=saha-db -e POSTGRES_USER=saha \
-            -e POSTGRES_PASSWORD=saha_dev_only -e POSTGRES_DB=saha -e BACKUP_KEEP_DAYS=14 -e BACKUP_HOUR=03 -e BACKUP_ONCE=1 \
-            -v /tmp/bk:/backups -v /tmp/backup.sh:/backup.sh:ro postgres:16-alpine sh /backup.sh
-          f=$(ls /tmp/bk/saha-*.sql.gz | head -1); ls -la /tmp/bk; test -s "$f"
+          # تشغيل فعلي لخدمة backup كما سيشغّلها Docker Manager (مشروع منفصل على الشبكة saha_net)
+          docker compose -f infra/docker-compose.ops.yml up -d backup
+          for i in $(seq 1 45); do docker logs saha-backup 2>&1 | grep -q '✅ نسخة احتياطية' && break; sleep 2; done
+          docker logs saha-backup
+          docker logs saha-backup 2>&1 | grep -q 'النسخ الاحتياطي يعمل'
+          docker logs saha-backup 2>&1 | grep -q '✅ نسخة احتياطية'
+          docker compose -f infra/docker-compose.ops.yml down
+          docker ps --format '{{.Names}}' | grep -qx saha-db
+          f=$(ls /docker/saha-stack/backups/saha-*.sql.gz | head -1); ls -la /docker/saha-stack/backups; test -s "$f"
           # الاسترجاع في قاعدة جديدة، ثم المقارنة وسلامة سجل التدقيق
           q() { docker exec -i saha-db psql -U saha -v ON_ERROR_STOP=1 -At "$@"; }
           q -d saha -c "CREATE DATABASE saha_restore"

@@ -1,6 +1,6 @@
 # ملف تسليم الجلسة — مشروع «ساحة»
 
-آخر تحديث: 2026-11-25 (الجلسة 8)
+آخر تحديث: 2026-11-25 (الجلسة 9)
 
 ## المشروع باختصار
 منصة «ساحة» (Saha) للبطولات الكروية: موقع + تطبيق + لوحة إدارة.
@@ -127,6 +127,22 @@
 - ⏳ **النسخ الاحتياطي — خدمة `backup`** (postgres:16-alpine): نسخة عند أول تشغيل ثم يومياً 03:00 بغداد في `/docker/saha-stack/backups/saha-*.sql.gz`، الاحتفاظ 14 يوماً، `pg_dump --clean --if-exists`. اختبار CI (نسخ ← استرجاع في قاعدة جديدة ← مقارنة الأعداد ← `audit_verify()` ← استرجاع ثانٍ فوقها). ✅ (2026-11-25) **أُصلح:** سبب التعليق كان في الاختبار لا في ملف السيرفر — `docker compose config` يُبقي الهروب `$$` في ناتجه (Compose يفكّه عند التشغيل فقط)، فصار `$$` رقم العملية، ولم يتحقق شرط `BACKUP_ONCE` فدخل السكربت حلقة اليوم الكامل. الاختبار يفكّ `$$` الآن كما يفعل Compose ويتحقق منه، ومهلة 120 ثانية. نجح: نسخ ← استرجاع ← تطابق الأعداد ← `audit_verify()` ← استرجاع ثانٍ فوقها.
 - ✅ **TestFlight مجهّز:** `apps/mobile/eas.json` (profile `production`، `SAHA_STORE=1`)، أيقونة `apps/mobile/assets/icon.png`، نصوص الأذونات بالعربية، و`.github/workflows/app-store.yml` يدوي (بناء EAS ثم `eas submit`). **ينتظر من المالك:** حساب Apple Developer (99$ سنوياً)، تطبيق في App Store Connect بالمعرّف `app.saha.iq`، والأسرار: `ASC_KEY_P8`، `ASC_KEY_ID`، `ASC_ISSUER_ID`، `APPLE_TEAM_ID`، `ASC_APP_ID`. لم يُجرَّب بعد (غير مؤكد أن EAS ينشئ شهادات iOS دون تفاعل بمفتاح ASC). نسخة المتجر تستخدم https فيجب أن ينجح HTTPS أولاً.
 
+## الجلسة 9 — saha-ops ⏳ (2026-11-25)
+- **مشروع منفصل `saha-ops`** (`infra/docker-compose.ops.yml`): خدمتا `backup` و`edge` فقط، على الشبكة `saha_net`، أسرار القاعدة من `/docker/saha-stack/.env` (مسار مطلق، قراءة فقط)، النسخ في `/docker/saha-stack/backups`. لا يغيّر `saha-stack` إطلاقاً.
+- **الرابط العام** لزر Compose from URL يقدّمه موقع ساحة: `http://72.61.18.234:8098/ops/saha-ops.yml` (الملف يُنسخ إلى صورة saha-web عند البناء). نسخة الطوارئ: `/ops/saha-ops-remove.yml`.
+- أُزيلت `backup` و`edge` من `infra/docker-compose.stack.yml` (أربع خدمات) حتى لا تتكرر الأسماء.
+- الخطوات للمالك في القسم «تشغيل saha-ops من Docker Manager» أدناه.
+
+## تشغيل saha-ops من Docker Manager (بعد دمج PR الجلسة 9 وانتهاء البناء)
+1. Docker Manager ← Projects ← **`saha-stack`** ← ⋮ ← **Update** (ليصل الرابط الجديد للموقع). تحقق من Safari: http://72.61.18.234:8098/ops/saha-ops.yml يعرض نصاً يبدأ بـ «# «ساحة» — مشروع saha-ops».
+2. Docker Manager ← **Compose** ← **Compose from URL** ← الرابط: `http://72.61.18.234:8098/ops/saha-ops.yml` ← اسم المشروع: `saha-ops` ← **Deploy**.
+3. بعد دقيقتين: مشروع `saha-ops` فيه حاويتان: **saha-backup** و**saha-edge**. مشروع `saha-stack` يبقى بأربع حاويات كما هو.
+4. سجل `saha-edge` (Logs): «المواقع الأخرى قبل أي تغيير» ← «✅ الشهادة جاهزة» ← «🎉 ساحة على https://saha.72-61-18-234.sslip.io». إن ظهر ⛔ فلم يتغير شيء — انسخ السجل للجلسة.
+5. سجل `saha-backup`: «✅ نسخة احتياطية: /backups/saha-….sql.gz».
+6. Safari: https://saha.72-61-18-234.sslip.io/api/v1/health ← `ok`، **ثم افتح موقعي «خصوصي» و«مشاوي»**.
+7. **طوارئ** (إن تأثر أي موقع آخر لاحقاً): احذف مشروع `saha-ops` من Docker Manager ← Compose from URL بالرابط `http://72.61.18.234:8098/ops/saha-ops-remove.yml` باسم `saha-ops` ← تحذف saha-edge ملف ساحة وحده من Nginx. للرجوع: احذفه وأنشئه من الرابط العادي.
+- **إن رفض Docker Manager رابط http** (يشترط https): أخبر الجلسة — البديل نشر الملف نفسه على رابط https عام (مثلاً موقع Netlify صغير بحساب المالك).
+
 ## خطوات معلّقة (بالترتيب)
 1. ✅ (2026-11-23) المالك فتح `http://72.61.18.234:8098/api/v1/health` من Safari على الآيفون ← `ok` (المنفذ 8098 مفتوح من الخارج). ✅ تحديث الجلسة 3 وصل عبر زر Update في Docker Manager: رابط `/api/v1/tournaments/baghdad-sahat-2026/scorers` يعيد `[]`.
 2. ✅ (2026-11-23) صور الجلسة 3 تعمل على السيرفر، والـ migration `0004` طُبّق.
@@ -156,10 +172,10 @@
 - ✅ المالك ضغط Update في Docker Manager ← الحاويات الأربع حُدّثت (زر الإشعار التجريبي صار على الخادم). **saha-backup وsaha-edge لم تُضافا بعد** — Update لا يضيف خدمات جديدة.
 - ⚠️ المالك **لا يستطيع اللصق في محرر Docker Manager من الآيفون**، ووكيل هوستنجر يرفض أوامر الكتابة المباشرة (cp/mv/`>`) ونص Compose الطويل يُقتطع عند لصقه له. الحل الحالي: نص الوكيل أدناه (أوامر Docker فقط؛ حاوية مؤقتة تنسخ الملف). **بانتظار ردّ الوكيل.**
 - ❌ (03:31) **الوكيل رفض الخطوة 2، ثم رفض حتى `docker pull`**: الوكيل الآن للقراءة والفحص فقط — لا تعطه أي أمر تنفيذ. لم يتغير شيء على السيرفر.
-- **الخطة التالية (أول مهمة في الجلسة القادمة):** مشروع **منفصل جديد** في Docker Manager باسم `saha-ops` فيه خدمتا `backup` و`edge` فقط (شبكة `saha_net` الخارجية، `env_file: /docker/saha-stack/.env` بمسار مطلق، مجلد النسخ `/docker/saha-stack/backups`)، يُنشأ بزر **Compose from URL** برابط عام قصير — لا لصق ولا وكيل ولا تعديل على `saha-stack`. الرابط العام: يقدّمه saha-web (مثلاً `http://72.61.18.234:8098/ops/saha-ops.yml`) أو مصدر عام آخر؛ يحتاج PR ← دمج (بضغطة من المالك إن رُفض الدمج من الجلسة) ← Update لـ saha-stack ← Compose from URL. بعدها يُحذف `backup` و`edge` من `infra/docker-compose.stack.yml` أو يبقيان موثّقين كبديل، حتى لا تتكرر الحاويات بالاسم نفسه. تأكد أن Compose from URL يقبل http أو احتج لـ https.
+- **الخطة التالية (نُفّذت في الجلسة 9 — انظر «الجلسة 9» أعلاه):** مشروع **منفصل جديد** في Docker Manager باسم `saha-ops` فيه خدمتا `backup` و`edge` فقط (شبكة `saha_net` الخارجية، `env_file: /docker/saha-stack/.env` بمسار مطلق، مجلد النسخ `/docker/saha-stack/backups`)، يُنشأ بزر **Compose from URL** برابط عام قصير — لا لصق ولا وكيل ولا تعديل على `saha-stack`. الرابط العام: يقدّمه saha-web (مثلاً `http://72.61.18.234:8098/ops/saha-ops.yml`) أو مصدر عام آخر؛ يحتاج PR ← دمج (بضغطة من المالك إن رُفض الدمج من الجلسة) ← Update لـ saha-stack ← Compose from URL. بعدها يُحذف `backup` و`edge` من `infra/docker-compose.stack.yml` أو يبقيان موثّقين كبديل، حتى لا تتكرر الحاويات بالاسم نفسه. تأكد أن Compose from URL يقبل http أو احتج لـ https.
 - بعد نجاح HTTPS: متغير المستودع `SAHA_WEB_URL` = `https://saha.72-61-18-234.sslip.io` ← إعادة تشغيل «نشر التطبيق» على main ← تجربة «أرسل إشعاراً تجريبياً» على الآيفون ← TestFlight.
 
-### نص وكيل هوستنجر لإضافة saha-backup وsaha-edge
+### ~~نص وكيل هوستنجر لإضافة saha-backup وsaha-edge~~ (ملغى — الوكيل رفضه، وحلّ محله saha-ops)
 ```text
 أريد تحديث مشروع saha-stack في /docker/saha-stack فقط، بأوامر Docker وحدها، دون لمس أي حاوية أو مشروع آخر، خصوصاً «خصوصي» و«مشاوي» وsaha-preview، ودون لمس ملف .env.
 
@@ -185,7 +201,7 @@ docker compose -f /docker/saha-stack/docker-compose.yml up -d
 - ناتج: curl -s https://saha.72-61-18-234.sslip.io/api/v1/health
 ```
 
-## تشغيل HTTPS والنسخ الاحتياطي من Docker Manager (بعد دمج PR #9 وانتهاء البناء)
+## ~~تشغيل HTTPS والنسخ الاحتياطي من Docker Manager (لصق الملف)~~ (ملغى — حلّ محله «تشغيل saha-ops من Docker Manager»)
 1. افتح الملف على GitHub: https://github.com/abtkare/saha/blob/main/infra/docker-compose.stack.yml ← زر النسخ (Copy raw file).
 2. هوستنجر ← VPS ← Manage ← Docker Manager ← Projects ← **`saha-stack`** (ليس `saha`) ← تعديل الملف ← امسح المحتوى والصق الجديد ← **Deploy**. لا تغيّر ملف `.env`.
 3. انتظر دقيقتين. يجب أن تظهر 6 حاويات: saha-db، saha-redis، saha-api، saha-web، **saha-backup**، **saha-edge**.
