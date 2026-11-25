@@ -204,7 +204,7 @@ jobs:
           # نفس مسارات السيرفر: /docker/saha-stack/.env و/docker/saha-stack/backups
           sudo mkdir -p /docker/saha-stack/backups
           printf '%s\n' POSTGRES_USER=saha POSTGRES_DB=saha POSTGRES_PASSWORD=saha_dev_only | sudo tee /docker/saha-stack/.env >/dev/null
-          test "$(docker compose -f infra/docker-compose.ops.yml config --services | sort | tr '\n' ' ')" = "backup edge "
+          test "$(docker compose -f infra/docker-compose.ops.yml config --services | sort | tr '\n' ' ')" = "backup edge updater "
           docker compose -f infra/docker-compose.ops.yml config --format json > /tmp/ops.json
           node -e "const c=JSON.parse(require('fs').readFileSync('/tmp/ops.json'));process.stdout.write(c.services.backup.command[0].replace(/\\$\\$/g,'\$'))" > /tmp/backup.sh
           ! grep -F '$$' /tmp/backup.sh
