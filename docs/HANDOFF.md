@@ -1,6 +1,6 @@
 # ملف تسليم الجلسة — مشروع «ساحة»
 
-آخر تحديث: 2026-11-25 (الجلسة 9)
+آخر تحديث: 2026-11-25 05:22 (نهاية محادثة الجلسة 9)
 
 ## المشروع باختصار
 منصة «ساحة» (Saha) للبطولات الكروية: موقع + تطبيق + لوحة إدارة.
@@ -131,7 +131,14 @@
 - ✅ **(04:04) نجح على السيرفر:** المالك أنشأ `saha-ops` بزر Compose from URL (قبِل رابط http). saha-edge: شهادة Let's Encrypt (تنتهي 2027-02-23 وتتجدد تلقائياً)، و`https://saha.72-61-18-234.sslip.io/api/v1/health` ← 200، والمواقع الأخرى (khousousi.com، mashawi وadminmashawi، api، esign، ocr) بنفس رموزها قبل وبعد. saha-backup: أول نسخة `saha-2026-11-25_0404.sql.gz` (20K).
 - ملاحظة: قبل إنشاء saha-ops كان رابط sslip يعرض صفحة دخول «مشاوي» لأنه الموقع الافتراضي في Nginx لأي نطاق غير معرَّف — ليس عطلاً.
 - ✅ **(04:23) إشعار فعلي وصل إلى آيفون المالك** من زر «أرسل إشعاراً تجريبياً» (Expo Go، التطبيق على https). إشعارات الهاتف تعمل.
-- ⏳ **TestFlight:** المالك أكّد أن لديه حساب Apple Developer (2026-11-25). الخطة: سر واحد فقط في GitHub (`ASC_KEY_P8`)، والقيم غير السرية (Key ID، Issuer ID، Team ID، Apple ID للتطبيق، نوع الحساب) يرسلها المالك في المحادثة فتُكتب في `app-store.yml`.
+- ⏳ **TestFlight — حالة 05:22:**
+  - ✅ حساب Apple Developer **شركة** (COMPANY_OR_ORGANIZATION): «شركة عصر الريادة للتجارة العامة والنقل العام وتأجير السيارات ذات المسؤولية المحدودة»، **Team ID `2PB3RY6HRM`** (في الحساب فريق آخر «شركة جلب الدرع» — لا نستخدمه). بريد الدخول للمطوّر: alriyadagroup01@gmail.com (ليس Apple ID الشخصي).
+  - ✅ المعرّف `app.saha.iq` مسجّل (الوصف Saha؛ عليه بالخطأ قدرة «يتطلب إنشاء الحساب رقم هاتف» — لا تضر). Push Notifications لم تُفعَّل يدوياً — EAS يفعّلها عند البناء.
+  - ✅ تطبيق App Store Connect أُنشئ: الاسم «ساحة البطولات»، iOS، العربية، SKU `saha`. رسالة «user access settings could not be saved» لا تهم. رسالة «Unable to Add for Review» تخص مراجعة المتجر لاحقاً لا TestFlight.
+  - **باقٍ من المالك:** (1) رقم **Apple ID** للتطبيق من App Information. (2) مفتاح API: Users and Access ← Integrations ← App Store Connect API (Request Access إن ظهر) ← Team Keys ← + ← الاسم EAS، الصلاحية **Admin** ← Download ملف .p8 + نسخ **Issuer ID** و**Key ID**. (3) السر `ASC_KEY_P8` في GitHub (يغيّر امتداد الملف إلى .txt في «الملفات» ليفتحه وينسخ نصه) — الجلسة لا تملك صلاحية أسرار/متغيرات Actions.
+  - **على الجلسة بعد استلام القيم:** في `.github/workflows/app-store.yml` اكتب القيم غير السرية مباشرة (Team ID `2PB3RY6HRM`، `EXPO_APPLE_TEAM_TYPE: COMPANY_OR_ORGANIZATION`، Key ID، Issuer ID، ASC App ID) واجعل السر الوحيد `ASC_KEY_P8` (+ EXPO_TOKEN الموجود)، ثم PR ← CI ← دمج ← تشغيل «نسخة TestFlight (iOS)» (workflow_dispatch — إن رُفض من الجلسة لأن مسارات Actions محجوبة بالبروكسي، فالمالك يضغط Run workflow من GitHub). غير مؤكد أن EAS ينشئ شهادات iOS دون تفاعل بمفتاح ASC — إن فشل فالبديل: تشغيل `eas credentials` تفاعلياً مرة واحدة (يحتاج حاسوباً) أو رفع شهادة/ملف تعريف يدوياً.
+- ملاحظة: الجلسة **لا تستطيع** قراءة/تشغيل مسارات GitHub Actions عبر البروكسي (`/actions/...` محجوب: المتغيرات والأسرار وworkflow_dispatch)، لكنها تقرأ نتائج check-runs وسجلات jobs عبر `/commits/<sha>/check-runs` و`/actions/jobs/<id>/logs`.
+- (قديم) المالك أكّد أن لديه حساب Apple Developer (2026-11-25). الخطة: سر واحد فقط في GitHub (`ASC_KEY_P8`)، والقيم غير السرية (Key ID، Issuer ID، Team ID، Apple ID للتطبيق، نوع الحساب) يرسلها المالك في المحادثة فتُكتب في `app-store.yml`.
 - ✅ **التطبيق صار على https:** القيمة الافتراضية لـ `SAHA_WEB_URL` في `app-update.yml` وبديل `src/config.ts` = `https://saha.72-61-18-234.sslip.io` (الجلسة لا تملك صلاحية متغيرات GitHub Actions، فغُيّرت القيمة في الملف).
 - **مشروع منفصل `saha-ops`** (`infra/docker-compose.ops.yml`): خدمتا `backup` و`edge` فقط، على الشبكة `saha_net`، أسرار القاعدة من `/docker/saha-stack/.env` (مسار مطلق، قراءة فقط)، النسخ في `/docker/saha-stack/backups`. لا يغيّر `saha-stack` إطلاقاً.
 - **الرابط العام** لزر Compose from URL يقدّمه موقع ساحة: `http://72.61.18.234:8098/ops/saha-ops.yml` (الملف يُنسخ إلى صورة saha-web عند البناء). نسخة الطوارئ: `/ops/saha-ops-remove.yml`.
