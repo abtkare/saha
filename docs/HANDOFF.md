@@ -172,10 +172,10 @@
 - ✅ المالك ضغط Update في Docker Manager ← الحاويات الأربع حُدّثت (زر الإشعار التجريبي صار على الخادم). **saha-backup وsaha-edge لم تُضافا بعد** — Update لا يضيف خدمات جديدة.
 - ⚠️ المالك **لا يستطيع اللصق في محرر Docker Manager من الآيفون**، ووكيل هوستنجر يرفض أوامر الكتابة المباشرة (cp/mv/`>`) ونص Compose الطويل يُقتطع عند لصقه له. الحل الحالي: نص الوكيل أدناه (أوامر Docker فقط؛ حاوية مؤقتة تنسخ الملف). **بانتظار ردّ الوكيل.**
 - ❌ (03:31) **الوكيل رفض الخطوة 2، ثم رفض حتى `docker pull`**: الوكيل الآن للقراءة والفحص فقط — لا تعطه أي أمر تنفيذ. لم يتغير شيء على السيرفر.
-- **الخطة التالية (أول مهمة في الجلسة القادمة):** مشروع **منفصل جديد** في Docker Manager باسم `saha-ops` فيه خدمتا `backup` و`edge` فقط (شبكة `saha_net` الخارجية، `env_file: /docker/saha-stack/.env` بمسار مطلق، مجلد النسخ `/docker/saha-stack/backups`)، يُنشأ بزر **Compose from URL** برابط عام قصير — لا لصق ولا وكيل ولا تعديل على `saha-stack`. الرابط العام: يقدّمه saha-web (مثلاً `http://72.61.18.234:8098/ops/saha-ops.yml`) أو مصدر عام آخر؛ يحتاج PR ← دمج (بضغطة من المالك إن رُفض الدمج من الجلسة) ← Update لـ saha-stack ← Compose from URL. بعدها يُحذف `backup` و`edge` من `infra/docker-compose.stack.yml` أو يبقيان موثّقين كبديل، حتى لا تتكرر الحاويات بالاسم نفسه. تأكد أن Compose from URL يقبل http أو احتج لـ https.
+- **الخطة التالية (نُفّذت في الجلسة 9 — انظر «الجلسة 9» أعلاه):** مشروع **منفصل جديد** في Docker Manager باسم `saha-ops` فيه خدمتا `backup` و`edge` فقط (شبكة `saha_net` الخارجية، `env_file: /docker/saha-stack/.env` بمسار مطلق، مجلد النسخ `/docker/saha-stack/backups`)، يُنشأ بزر **Compose from URL** برابط عام قصير — لا لصق ولا وكيل ولا تعديل على `saha-stack`. الرابط العام: يقدّمه saha-web (مثلاً `http://72.61.18.234:8098/ops/saha-ops.yml`) أو مصدر عام آخر؛ يحتاج PR ← دمج (بضغطة من المالك إن رُفض الدمج من الجلسة) ← Update لـ saha-stack ← Compose from URL. بعدها يُحذف `backup` و`edge` من `infra/docker-compose.stack.yml` أو يبقيان موثّقين كبديل، حتى لا تتكرر الحاويات بالاسم نفسه. تأكد أن Compose from URL يقبل http أو احتج لـ https.
 - بعد نجاح HTTPS: متغير المستودع `SAHA_WEB_URL` = `https://saha.72-61-18-234.sslip.io` ← إعادة تشغيل «نشر التطبيق» على main ← تجربة «أرسل إشعاراً تجريبياً» على الآيفون ← TestFlight.
 
-### نص وكيل هوستنجر لإضافة saha-backup وsaha-edge
+### ~~نص وكيل هوستنجر لإضافة saha-backup وsaha-edge~~ (ملغى — الوكيل رفضه، وحلّ محله saha-ops)
 ```text
 أريد تحديث مشروع saha-stack في /docker/saha-stack فقط، بأوامر Docker وحدها، دون لمس أي حاوية أو مشروع آخر، خصوصاً «خصوصي» و«مشاوي» وsaha-preview، ودون لمس ملف .env.
 
@@ -201,7 +201,7 @@ docker compose -f /docker/saha-stack/docker-compose.yml up -d
 - ناتج: curl -s https://saha.72-61-18-234.sslip.io/api/v1/health
 ```
 
-## تشغيل HTTPS والنسخ الاحتياطي من Docker Manager (بعد دمج PR #9 وانتهاء البناء)
+## ~~تشغيل HTTPS والنسخ الاحتياطي من Docker Manager (لصق الملف)~~ (ملغى — حلّ محله «تشغيل saha-ops من Docker Manager»)
 1. افتح الملف على GitHub: https://github.com/abtkare/saha/blob/main/infra/docker-compose.stack.yml ← زر النسخ (Copy raw file).
 2. هوستنجر ← VPS ← Manage ← Docker Manager ← Projects ← **`saha-stack`** (ليس `saha`) ← تعديل الملف ← امسح المحتوى والصق الجديد ← **Deploy**. لا تغيّر ملف `.env`.
 3. انتظر دقيقتين. يجب أن تظهر 6 حاويات: saha-db، saha-redis، saha-api، saha-web، **saha-backup**، **saha-edge**.
