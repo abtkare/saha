@@ -1,12 +1,16 @@
 /** مكونات أساسية بنفس قيم saha.css: البطاقة، الشارة، الأزرار، الحقول، التبويبات، الأقسام */
 import { useRef, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Pressable, RefreshControl, ScrollView, TextInput, View,
+  ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, TextInput, View,
   type StyleProp, type TextInputProps, type ViewStyle,
 } from 'react-native';
 import { RESULT_STATUS_LABELS, type ResultStatus } from '@saha/shared';
 import { ff, isRTL, radius, right, row, start, T, useTheme } from '../theme';
 import { Icon, type IconName } from './icons';
+import { WEB_URL } from '../config';
+
+/** روابط الصور من الخادم (/api/v1/media/5) تُكمَّل بعنوانه */
+export const mediaUri = (u: string) => (/^https?:/.test(u) ? u : `${WEB_URL}${u.startsWith('/') ? '' : '/'}${u}`);
 
 export function Card({ children, style, onPress, flush }: { children: ReactNode; style?: StyleProp<ViewStyle>; onPress?: () => void; flush?: boolean }) {
   const { c } = useTheme();
@@ -211,12 +215,36 @@ export function Notice({ tone = 'info', children }: { tone?: 'info' | 'ok' | 'er
   );
 }
 
-/** شعار الفريق المؤقت: الحرف الأول في دائرة (.crest) */
-export function Crest({ name, size = 36, onHero }: { name: string; size?: number; onHero?: boolean }) {
+/** شعار الفريق: صورته إن رفعها منشئ الفريق، وإلا الحرف الأول في دائرة (.crest) */
+export function Crest({ name, size = 36, onHero, uri }: { name: string; size?: number; onHero?: boolean; uri?: string | null }) {
   const { c } = useTheme();
+  const [failed, setFailed] = useState(false);
+  const box = { width: size, height: size, borderRadius: size / 2 };
+  if (uri && !failed) {
+    return (
+      <View style={[box, { backgroundColor: '#FFFFFF', overflow: 'hidden', borderWidth: 1, borderColor: onHero ? 'rgba(255,255,255,0.6)' : c.line }]}>
+        <Image source={{ uri: mediaUri(uri) }} style={box} resizeMode="cover" onError={() => setFailed(true)} accessibilityLabel={`شعار ${name}`} />
+      </View>
+    );
+  }
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: onHero ? '#FFFFFF' : c.tint, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={[box, { backgroundColor: onHero ? '#FFFFFF' : c.tint, alignItems: 'center', justifyContent: 'center' }]}>
       <T v="num" size={Math.round(size * 0.42)} color={onHero ? '#0B6E4F' : c.primary} center>{name.trim().charAt(0)}</T>
+    </View>
+  );
+}
+
+/** الصورة الشخصية لصاحب الفريق/المؤثر/صاحب الصفحة بحد ذهبي، وإلا أيقونة شخص */
+export function Avatar({ uri, size = 28, name }: { uri?: string | null; size?: number; name?: string | null }) {
+  const { c } = useTheme();
+  const [failed, setFailed] = useState(false);
+  const box = { width: size, height: size, borderRadius: size / 2 };
+  return (
+    <View style={[box, { borderWidth: 2, borderColor: '#F2B705', backgroundColor: c.tint, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }]}
+      accessibilityLabel={name ? `صورة ${name}` : undefined}>
+      {uri && !failed
+        ? <Image source={{ uri: mediaUri(uri) }} style={{ width: size - 4, height: size - 4, borderRadius: (size - 4) / 2 }} onError={() => setFailed(true)} />
+        : <Icon name="user" size={Math.round(size * 0.55)} color={c.primary} />}
     </View>
   );
 }

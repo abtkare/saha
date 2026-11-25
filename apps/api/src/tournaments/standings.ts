@@ -9,8 +9,8 @@ export interface StandingMatch {
   homeScore: number | null; awayScore: number | null;
   resultStatus: string;
 }
-export interface StandingRow {
-  position: number; team: StandingTeam;
+export interface StandingRow<T extends StandingTeam = StandingTeam> {
+  position: number; team: T;
   played: number; won: number; drawn: number; lost: number;
   goalsFor: number; goalsAgainst: number; goalDiff: number; points: number;
 }
@@ -20,8 +20,8 @@ export const COUNTED_STATUSES = ['confirmed', 'final'] as const;
 /** مباريات تدخل جدول الترتيب: الدوري ودور المجموعات (لا الأدوار الإقصائية) */
 export const isGroupStage = (stage: string | null) => stage === null || stage === 'league' || stage === 'group';
 
-export function computeStandings(teams: StandingTeam[], matches: StandingMatch[]): StandingRow[] {
-  const rows = new Map<number, Omit<StandingRow, 'position'>>();
+export function computeStandings<T extends StandingTeam>(teams: T[], matches: StandingMatch[]): StandingRow<T>[] {
+  const rows = new Map<number, Omit<StandingRow<T>, 'position'>>();
   for (const team of teams) {
     rows.set(team.id, { team, played: 0, won: 0, drawn: 0, lost: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, points: 0 });
   }

@@ -10,6 +10,7 @@ import { assertActive, assertCan } from '../auth/auth.guard';
 import type { AuthContext } from '../auth/auth.types';
 import { eligibilityProblems, publicPlayerName, PUBLIC_PLAYER_SELECT } from './players';
 import { NotificationsService } from '../notifications/notifications';
+import { mediaUrl } from '../uploads/uploads';
 
 type B = Record<string, unknown>;
 type Ctx = { auth: AuthContext; ip: string };
@@ -38,6 +39,32 @@ export class TeamsService {
     return u;
   }
 
+  /**
+   * صورة الفريق (الشعار أو صورة صاحب الفريق): رقم صورة رفعها المستخدم نفسه بـ POST /uploads (خاصة أو عامة).
+   * undefined = لم يُرسل الحقل، null = حذف الصورة. الصورة تصير عامة عند ربطها بالفريق لتظهر في الجداول.
+   */
+  private async teamImage(tx: Prisma.TransactionClient, body: B, field: string, label: string, userId: number): Promise<string | null | undefined> {
+    if (!(field in (body ?? {}))) return undefined;
+    if (body[field] === null) return null;
+    const id = int(body, field, { min: 1, label })!;
+    const media = await tx.mediaAsset.findUnique({ where: { id }, select: { uploadedById: true, isPublic: true } });
+    if (!media || media.uploadedById !== userId) throw new AppError(400, 'MEDIA_INVALID', `${label}: الصورة غير موجودة أو لم ترفعها أنت.`);
+    if (!media.isPublic) await tx.mediaAsset.update({ where: { id }, data: { isPublic: true } });
+    return mediaUrl(id);
+  }
+
+  /** الحقول الاختيارية للهوية: الشعار، اسم صاحب الفريق/المؤثر/صاحب الصفحة، وصورته */
+  private async identity(tx: Prisma.TransactionClient, body: B, userId: number) {
+    const data: { logoUrl?: string | null; ownerPhotoUrl?: string | null; ownerName?: string | null } = {};
+    const logo = await this.teamImage(tx, body, 'logoMediaId', 'شعار الفريق', userId);
+    if (logo !== undefined) data.logoUrl = logo;
+    const photo = await this.teamImage(tx, body, 'ownerPhotoMediaId', 'صورة صاحب الفريق', userId);
+    if (photo !== undefined) data.ownerPhotoUrl = photo;
+    const ownerName = nullableStr(body, 'ownerName', { max: 60, label: 'اسم صاحب الفريق' });
+    if (ownerName !== undefined) data.ownerName = ownerName || null;
+    return data;
+  }
+
   // ───────────── الفريق ─────────────
 
   /** POST /teams {nameAr, city?, fbPageUrl?, communityId?} — المنشئ يصبح مدير الفريق */
@@ -54,9 +81,11 @@ export class TeamsService {
     if (communityId !== null && !(await this.prisma.community.findUnique({ where: { id: communityId } }))) {
       throw new AppError(400, 'COMMUNITY_NOT_FOUND', 'المجتمع غير موجود.');
     }
+    const city = str(body, 'city', { optional: true, max: 40, label: 'المدينة' }) ?? null;
     const team = await this.prisma.$transaction(async (tx) => {
+      const ident = await this.identity(tx, body, auth.userId);
       const t = await tx.team.create({
-        data: { nameAr, city: str(body, 'city', { optional: true, max: 40, label: 'المدينة' }) ?? null, fbPageUrl, communityId, managerId: auth.userId, joinCode: randomCode() },
+        data: { nameAr, city, fbPageUrl, communityId, managerId: auth.userId, joinCode: randomCode(), ...ident },
       });
       await tx.userRole.create({ data: { userId: auth.userId, role: 'team_manager', teamId: t.id } });
       await this.audit.record({ actorUserId: auth.userId, action: 'team.create', entity: 'team', entityId: t.id, payload: { nameAr }, ip }, tx);
@@ -70,7 +99,7 @@ export class TeamsService {
     const t = await this.prisma.team.findUnique({
       where: { id },
       select: {
-        id: true, nameAr: true, logoUrl: true, city: true, fbPageUrl: true, verifiedAt: true, verifyMethod: true,
+        id: true, nameAr: true, logoUrl: true, ownerName: true, ownerPhotoUrl: true, city: true, fbPageUrl: true, verifiedAt: true, verifyMethod: true,
         community: { select: { id: true, kind: true, nameAr: true } },
         players: { orderBy: [{ shirtNo: 'asc' }], select: { shirtNo: true, player: { select: PUBLIC_PLAYER_SELECT } } },
         registrations: { where: { status: 'approved', tournament: { status: { not: 'draft' } } }, select: { groupLabel: true, tournament: { select: { id: true, nameAr: true, slug: true, status: true, kind: true } } } },
@@ -99,7 +128,7 @@ export class TeamsService {
   myTeams(auth: AuthContext) {
     return this.prisma.team.findMany({
       where: { managerId: auth.userId },
-      select: { id: true, nameAr: true, city: true, joinCode: true, verifiedAt: true, fbPageUrl: true, _count: { select: { players: true } } },
+      select: { id: true, nameAr: true, city: true, joinCode: true, verifiedAt: true, fbPageUrl: true, logoUrl: true, ownerName: true, ownerPhotoUrl: true, _count: { select: { players: true } } },
     });
   }
 
@@ -119,6 +148,7 @@ export class TeamsService {
       Object.assign(data, { fbPageUrl: fb, fbPageId: null, verifiedAt: null, verifyMethod: null });
     }
     const updated = await this.prisma.$transaction(async (tx) => {
+      Object.assign(data, await this.identity(tx, body, auth.userId));
       if ('verifiedAt' in data) await tx.teamVerificationRequest.updateMany({ where: { teamId: id, status: 'pending' }, data: { status: 'withdrawn' } });
       const u = await tx.team.update({ where: { id }, data });
       await this.audit.record({ actorUserId: auth.userId, action: 'team.update', entity: 'team', entityId: id, payload: { fields: Object.keys(data) }, ip }, tx);

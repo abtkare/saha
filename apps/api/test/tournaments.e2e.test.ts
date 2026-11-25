@@ -297,6 +297,10 @@ describe('الجلسة 3 — بطولة دوري بـ 8 فرق من البداي
     await setResult(match.id, 2, 0, 'confirmed');
     const scorers = await api('GET', `/tournaments/${leagueId}/scorers`);
     expect(scorers.body[0]).toMatchObject({ player: { name: 'لاعب ثان' }, team: { id: m1.teamId }, goals: 2 });
+    // الجلسة 12: أفضل الهدافين وأفضل اللاعبين
+    const stars = await api('GET', `/tournaments/${leagueId}/stars`);
+    expect(stars.body.topScorers[0]).toMatchObject({ rank: 1, goals: 2, mvp: 1, player: { name: 'لاعب ثان' }, team: { id: m1.teamId } });
+    expect(stars.body.bestPlayers[0]).toMatchObject({ rank: 1, mvp: 1, goals: 2, player: { id: scorer.id } });
   });
 
   it('الترتيب يُحسب صحيحاً بعد كل النتائج، والمؤقتة والمتنازع عليها لا تدخل', async () => {
@@ -421,6 +425,31 @@ describe('الأهلية، التوثيق اليدوي، خروج المغلوب
     return { id, draw: d.body };
   }
 
+  it('الجلسة 12: شعار الفريق وصورة صاحبه — صورة رفعها المدير نفسه فقط، وتظهر في الترتيب', async () => {
+    const m = managers[1];
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64)]);
+    const up = async (token: string) => {
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array(png)]), 'logo.png');
+      const res = await fetch(`${BASE}/uploads`, { method: 'POST', body: form, headers: { authorization: `Bearer ${token}` } });
+      return (await res.json()) as { id: number; isPublic: boolean };
+    };
+    const logo = await up(m.token);
+    const photo = await up(m.token);
+    expect(logo.isPublic).toBe(false);
+    const stranger = await up(managers[2].token);
+    expect((await api('PATCH', `/teams/${m.teamId}`, { logoMediaId: stranger.id }, m.token)).body.code).toBe('MEDIA_INVALID');
+    expect((await api('PATCH', `/teams/${m.teamId}`, { logoMediaId: logo.id }, managers[2].token)).status).toBe(403);
+    const r = await api('PATCH', `/teams/${m.teamId}`, { logoMediaId: logo.id, ownerPhotoMediaId: photo.id, ownerName: 'أبو علي الرياضي' }, m.token);
+    expect(r.body).toMatchObject({ logoUrl: `/api/v1/media/${logo.id}`, ownerPhotoUrl: `/api/v1/media/${photo.id}`, ownerName: 'أبو علي الرياضي' });
+    expect((await fetch(`${BASE}/media/${logo.id}`)).status).toBe(200);
+    const pub = await api('GET', `/teams/${m.teamId}`);
+    expect(pub.body).toMatchObject({ logoUrl: `/api/v1/media/${logo.id}`, ownerName: 'أبو علي الرياضي' });
+    const st = await api('GET', `/tournaments/${leagueId}/standings`);
+    expect(st.body.rows.find((x: any) => x.team.id === m.teamId).team).toMatchObject({ logoUrl: `/api/v1/media/${logo.id}`, ownerPhotoUrl: `/api/v1/media/${photo.id}` });
+    expect((await api('PATCH', `/teams/${m.teamId}`, { ownerPhotoMediaId: null, ownerName: null }, m.token)).body).toMatchObject({ ownerPhotoUrl: null, ownerName: null, logoUrl: `/api/v1/media/${logo.id}` });
+  });
+
   it('خروج المغلوب بـ 4 فرق: نصف النهائي ← النهائي، والتعادل يحتاج ركلات ترجيح', async () => {
     const { id, draw } = await prepare('knockout', 4);
     expect(draw.matches.map((m: any) => m.stage)).toEqual(['sf', 'sf']);
@@ -464,7 +493,19 @@ describe('الأهلية، التوثيق اليدوي، خروج المغلوب
     const top = st.body.groups.map((g: any) => g.rows.map((r: any) => r.team.id));
     for (const rows of top) expect(rows).toEqual([...rows].sort((x: number, y: number) => rank(x) - rank(y)));
 
+    // الجلسة 12: طريق التأهل قبل توليد الإقصاء — المتأهلون المتوقعون بنفس تقاطع «الدور التالي»
+    const road = await api('GET', `/tournaments/${id}/road`);
+    expect(road.body.groups.map((g: any) => g.rows.map((r: any) => r.zone))).toEqual([['qualify', 'qualify', null, null], ['qualify', 'qualify', null, null]]);
+    expect(road.body.bracket.map((r: any) => [r.stage, r.matches.length])).toEqual([['sf', 2], ['final', 1]]);
+    expect(road.body.bracket[0].matches.map((m: any) => [m.home.team.id, m.away.team.id])).toEqual([[top[0][0], top[1][1]], [top[1][0], top[0][1]]]);
+    expect(road.body.bracket[0].matches[0]).toMatchObject({ id: null, home: { label: 'أول (أ)', projected: true }, away: { label: 'ثاني (ب)' } });
+    expect(road.body.bracket[1].matches[0].home.label).toBe('الفائز من م1');
+    expect(road.body.champion).toBeNull();
+
     const nx = await api('POST', `/tournaments/${id}/next-round`, undefined, admin);
+    const road2 = await api('GET', `/tournaments/${id}/road`);
+    expect(road2.body.bracket[0].matches.every((m: any) => m.id !== null && !m.home.projected)).toBe(true);
+    expect(road2.body.groupStage.finished).toBe(true);
     const sf = nx.body.matches.filter((m: any) => m.stage === 'sf').map((m: any) => [m.homeTeam.id, m.awayTeam.id]);
     expect(sf).toEqual([[top[0][0], top[1][1]], [top[1][0], top[0][1]]]);
     expect(nx.body.matches.filter((m: any) => m.stage === 'sf').every((m: any) => m.round === 4)).toBe(true);

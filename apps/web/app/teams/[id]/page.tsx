@@ -10,7 +10,7 @@ import { AppBand } from '@/components/app-band';
 export const dynamic = 'force-dynamic';
 
 interface TeamDetail {
-  id: number; nameAr: string; logoUrl: string | null; city: string | null; fbPageUrl: string | null; verified: boolean;
+  id: number; nameAr: string; logoUrl: string | null; ownerName: string | null; ownerPhotoUrl: string | null; city: string | null; fbPageUrl: string | null; verified: boolean;
   community: { id: number; kind: string; nameAr: string } | null;
   players: { id: number; name: string; shirtNo: number | null }[];
   tournaments: { id: number; nameAr: string; slug: string; status: TournamentStatus; kind: TournamentKind; groupLabel: string | null }[];
@@ -39,6 +39,12 @@ export default async function TeamPage({ params }: Props) {
               {t.logoUrl ? <img src={t.logoUrl} alt="" className="crest xl" /> : <span className="crest xl">{initial(t.nameAr)}</span>}
               <div>
                 <h1>{t.nameAr}</h1>
+                {(t.ownerName || t.ownerPhotoUrl) && (
+                  <p className="team-owner">
+                    {t.ownerPhotoUrl && <img src={t.ownerPhotoUrl} alt="" className="owner-photo" />}
+                    <span>{t.ownerName ?? 'صاحب الفريق'}</span>
+                  </p>
+                )}
                 <div className="chips">
                   {t.verified && <span className="chip-gold">موثّق ✓</span>}
                   {t.city && <span>{t.city}</span>}

@@ -8,9 +8,9 @@ import { useInterval } from '../hooks';
 import { useNav } from '../nav';
 import { radius, row, T, useTheme } from '../theme';
 import { kickoffDay, kickoffTime, relativeTime, scoreText, shortDate, signed } from '../format';
-import type { Hero, HeroSlide, MatchItem, NewsItem, StandingRow, TournamentSummary } from '../types';
+import type { Hero, HeroSlide, MatchItem, NewsItem, StandingRow, TeamRef, TournamentSummary, Zone } from '../types';
 import { Icon, Mark, PitchLines } from './icons';
-import { Card, Chip, Crest, Progress, StatusBadge } from './ui';
+import { Avatar, Card, Chip, Crest, Progress, StatusBadge } from './ui';
 
 /** بطاقة المباراة: الشعاران والنتيجة وشارة الحالة تحتها، ثم الوقت والملعب */
 export function MatchCard({ m, showTournament, withDay }: { m: MatchItem; showTournament?: boolean; withDay?: boolean }) {
@@ -20,12 +20,12 @@ export function MatchCard({ m, showTournament, withDay }: { m: MatchItem; showTo
     <Card onPress={() => push({ name: 'match', id: m.id })} style={{ padding: 14, gap: 10 }}>
       {showTournament && m.tournament && <T v="small" muted center numberOfLines={1}>{m.tournament.nameAr}</T>}
       <View style={{ flexDirection: row, alignItems: 'center' }} accessible accessibilityLabel={`${m.homeTeam.nameAr} ${scoreText(m)} ${m.awayTeam.nameAr}، ${RESULT_STATUS_LABELS[m.resultStatus]}`}>
-        <TeamCol name={m.homeTeam.nameAr} />
+        <TeamCol name={m.homeTeam.nameAr} logo={m.homeTeam.logoUrl} />
         <View style={{ flex: 1, alignItems: 'center', gap: 6 }}>
           <T v="num" size={26} center style={{ lineHeight: 30 }}>{scoreText(m)}</T>
           <StatusBadge status={m.resultStatus} small />
         </View>
-        <TeamCol name={m.awayTeam.nameAr} />
+        <TeamCol name={m.awayTeam.nameAr} logo={m.awayTeam.logoUrl} />
       </View>
       <View style={{ flexDirection: row, justifyContent: 'center', gap: 14, borderTopWidth: 1, borderTopColor: c.line, paddingTop: 10, flexWrap: 'wrap' }}>
         {withDay && <T v="small" size={12} muted>{kickoffDay(m.kickoffAt)}</T>}
@@ -44,10 +44,10 @@ export function MatchCard({ m, showTournament, withDay }: { m: MatchItem; showTo
   );
 }
 
-function TeamCol({ name, onHero }: { name: string; onHero?: boolean }) {
+function TeamCol({ name, onHero, logo }: { name: string; onHero?: boolean; logo?: string | null }) {
   return (
     <View style={{ flex: 1, alignItems: 'center', gap: 4 }}>
-      <Crest name={name} size={onHero ? 44 : 36} onHero={onHero} />
+      <Crest name={name} uri={logo} size={onHero ? 44 : 36} onHero={onHero} />
       <T v="smallB" center numberOfLines={2} color={onHero ? '#FFFFFF' : undefined}>{name}</T>
     </View>
   );
@@ -95,29 +95,55 @@ export function tournamentProgress(t: TournamentSummary): { pct: number; label: 
 }
 
 /** جدول الترتيب: الأول بحد ذهبي. full = فاز/تعادل/خسر أيضاً */
-export function StandingsTable({ rows, full }: { rows: StandingRow[]; full?: boolean }) {
+/** لون شريط منطقة الجدول: المتأهلون أخضر، والمتصدر ذهبي */
+export const ZONE_COLOR: Record<Exclude<Zone, null>, string> = { qualify: '#0B6E4F', leader: '#F2B705' };
+
+/** الفريق في صف الجدول: الشعار وعليه صورة صاحب الفريق/المؤثر صغيرة بحد ذهبي، ثم الاسم واسم صاحبه */
+export function TeamCell({ team, size = 28 }: { team: TeamRef; size?: number }) {
+  const badge = Math.round(size * 0.62);
+  return (
+    <View style={{ flex: 1, flexDirection: row, alignItems: 'center', gap: 8 }}>
+      <View style={{ width: size + badge * 0.35, height: size + badge * 0.3 }}>
+        <Crest name={team.nameAr} uri={team.logoUrl} size={size} />
+        {team.ownerPhotoUrl ? (
+          <View style={[{ position: 'absolute', bottom: 0 }, row === 'row' ? { right: 0 } : { left: 0 }]}>
+            <Avatar uri={team.ownerPhotoUrl} size={badge} name={team.ownerName} />
+          </View>
+        ) : null}
+      </View>
+      <View style={{ flex: 1 }}>
+        <T v="bodyB" size={14} numberOfLines={1}>{team.nameAr}</T>
+        {team.ownerName ? <T v="tiny" muted numberOfLines={1}>{team.ownerName}</T> : null}
+      </View>
+    </View>
+  );
+}
+
+export function StandingsTable({ rows, full }: { rows: (StandingRow & { zone?: Zone })[]; full?: boolean }) {
   const { c } = useTheme();
   const { push } = useNav();
   const cols = full ? ['لعب', 'فاز', 'تعادل', 'خسر', 'الفارق', 'النقاط'] : ['لعب', 'الفارق', 'النقاط'];
-  const w = full ? 36 : 44;
+  const w = full ? 30 : 44;
   return (
     <Card flush>
-      <View style={{ flexDirection: row, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: c.head, gap: 6 }}>
-        <T v="tiny" muted style={{ width: 24 }}>#</T>
+      <View style={{ flexDirection: row, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: c.head, gap: 4 }}>
+        <T v="tiny" muted style={{ width: 20 }}>#</T>
         <T v="tiny" muted style={{ flex: 1 }}>الفريق</T>
         {cols.map((h) => <T key={h} v="tiny" muted center style={{ width: w }}>{h}</T>)}
       </View>
       {rows.length === 0 && <T muted center style={{ padding: 16 }}>لم تُعتمد فرق بعد.</T>}
       {rows.map((r, i) => {
-        const first = i === 0 && r.points > 0;
+        const zone = r.zone !== undefined ? r.zone : i === 0 && r.points > 0 ? 'leader' : null;
         const vals = full ? [r.played, r.won, r.drawn, r.lost, signed(r.goalDiff)] : [r.played, signed(r.goalDiff)];
         return (
           <Pressable key={r.team.id} onPress={() => push({ name: 'team', id: r.team.id })} accessibilityRole="button"
-            style={{ flexDirection: row, paddingVertical: 12, paddingHorizontal: 14, alignItems: 'center', gap: 6, borderTopWidth: 1, borderTopColor: c.line }}>
-            {first && <View style={[{ position: 'absolute', top: 0, bottom: 0, width: 3, backgroundColor: '#F2B705' }, row === 'row' ? { left: 0 } : { right: 0 }]} />}
-            <T v="num" size={15} style={{ width: 24 }}>{r.position}</T>
-            <T v="bodyB" size={14} style={{ flex: 1 }} numberOfLines={1}>{r.team.nameAr}</T>
-            {vals.map((v, k) => <T key={k} v="num" size={14} center style={{ width: w }}>{String(v)}</T>)}
+            accessibilityLabel={`${r.position}، ${r.team.nameAr}، ${r.points} نقطة${zone === 'qualify' ? '، في منطقة التأهل' : ''}`}
+            style={{ flexDirection: row, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center', gap: 4, borderTopWidth: 1, borderTopColor: c.line,
+              backgroundColor: zone === 'qualify' ? (c.dark ? 'rgba(47,163,122,0.08)' : 'rgba(11,110,79,0.04)') : undefined }}>
+            {zone && <View style={[{ position: 'absolute', top: 0, bottom: 0, width: 3, backgroundColor: ZONE_COLOR[zone] }, row === 'row' ? { left: 0 } : { right: 0 }]} />}
+            <T v="num" size={15} style={{ width: 20 }}>{r.position}</T>
+            <TeamCell team={r.team} />
+            {vals.map((v, k) => <T key={k} v="num" size={13} center style={{ width: w }}>{String(v)}</T>)}
             <T v="num" size={16} center color={c.primary} style={{ width: w }}>{r.points}</T>
           </Pressable>
         );
@@ -252,9 +278,9 @@ function MatchSlide({ s, w, h }: { s: HeroSlide; w: number; h: number }) {
           <View style={{ backgroundColor: '#FFFFFF', borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 }}><T v="tiny" color={stColor}>{st}</T></View>
         </View>
         <View style={{ flexDirection: row, alignItems: 'center' }}>
-          <TeamCol name={m.homeTeam.nameAr} onHero />
+          <TeamCol name={m.homeTeam.nameAr} logo={m.homeTeam.logoUrl} onHero />
           <T v="num" size={40} color="#FFFFFF" center style={{ flex: 1, lineHeight: 46 }}>{scoreText(m)}</T>
-          <TeamCol name={m.awayTeam.nameAr} onHero />
+          <TeamCol name={m.awayTeam.nameAr} logo={m.awayTeam.logoUrl} onHero />
         </View>
         <T v="small" size={12} color="#D6EAE2" center numberOfLines={1}>
           {live ? m.liveText : m.homePens !== null && m.awayPens !== null ? `ركلات الترجيح ${m.homePens} – ${m.awayPens}` : [m.venue, kickoffTime(m.kickoffAt)].filter(Boolean).join(' · ')}

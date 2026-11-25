@@ -3,7 +3,7 @@
     "name": "ساحة",
     "slug": "saha",
     "scheme": "saha",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#0B6E4F",

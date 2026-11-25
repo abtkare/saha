@@ -1,13 +1,14 @@
 /** الفريق (عام)، و«فريقي»: نتائج تنتظر تأكيدي، مباريات أحكمها، فرقي وإدارتها، إنشاء فريق والانضمام برمز */
 import { useState } from 'react';
-import { Alert, Share, View } from 'react-native';
+import { Alert, Pressable, Share, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { TOURNAMENT_KIND_LABELS, TOURNAMENT_STATUS_LABELS } from '@saha/shared';
-import { api } from '../api';
+import { api, uploadImage } from '../api';
 import { useAuth } from '../auth';
 import { MatchCard } from '../components/cards';
 import { Icon } from '../components/icons';
 import { HeroBlock, TabHeader, TopBar } from '../components/layout';
-import { Button, Card, Chip, Crest, Divider, Empty, ErrorBox, Field, ListRow, Loading, Notice, ScrollPage, Section } from '../components/ui';
+import { Avatar, Button, Card, Chip, Crest, Divider, Empty, ErrorBox, Field, ListRow, Loading, Notice, ScrollPage, Section } from '../components/ui';
 import { dateTime } from '../format';
 import { errMsg, useLoad } from '../hooks';
 import { useNav } from '../nav';
@@ -27,9 +28,15 @@ export function TeamScreen({ id }: { id: number }) {
           <>
             <HeroBlock>
               <View style={{ flexDirection: row, alignItems: 'center', gap: 14 }}>
-                <Crest name={t.nameAr} size={64} onHero />
+                <Crest name={t.nameAr} uri={t.logoUrl} size={64} onHero />
                 <View style={{ flex: 1, gap: 6 }}>
                   <T v="h1" color="#FFFFFF">{t.nameAr}</T>
+                  {(t.ownerName || t.ownerPhotoUrl) ? (
+                    <View style={{ flexDirection: row, alignItems: 'center', gap: 8 }}>
+                      <Avatar uri={t.ownerPhotoUrl} size={30} name={t.ownerName} />
+                      <T v="smallB" color="#DCEDE6" numberOfLines={1} style={{ flex: 1 }}>{t.ownerName ?? 'صاحب الفريق'}</T>
+                    </View>
+                  ) : null}
                   <View style={{ flexDirection: row, gap: 8, flexWrap: 'wrap' }}>
                     {t.verified && <Chip tone="gold">موثّق</Chip>}
                     {t.city ? <Chip tone="glass">{t.city}</Chip> : null}
@@ -167,6 +174,7 @@ export function CreateTeamScreen() {
       <ScrollPage>
         <View style={{ padding: 16, gap: 14 }}>
           {error && <Notice tone="error">{error}</Notice>}
+          <Notice>بعد الإنشاء تضيف شعار الفريق وصورة صاحبه (المؤثر أو صاحب الصفحة) من صفحة إدارة الفريق، فتظهر في جدول الترتيب.</Notice>
           <Field label="اسم الفريق" value={f.nameAr} onChangeText={(v) => setF({ ...f, nameAr: v })} maxLength={40} placeholder="مثال: شباب الكرادة" />
           <Field label="المدينة (اختياري)" value={f.city} onChangeText={(v) => setF({ ...f, city: v })} maxLength={40} placeholder="بغداد" />
           <Field label="رابط صفحة فيسبوك (اختياري)" value={f.fbPageUrl} onChangeText={(v) => setF({ ...f, fbPageUrl: v })} autoCapitalize="none" keyboardType="url" hint="لتوثيق الفريق لاحقاً بمنشور على الصفحة." />
@@ -240,6 +248,10 @@ export function TeamManageScreen({ id }: { id: number }) {
         {page.loading && !d ? <Loading /> : !d ? <View style={{ padding: 16 }}><ErrorBox message={page.error ?? ''} onRetry={page.refresh} /></View> : (
           <>
             {msg && <View style={{ padding: 16, paddingBottom: 0 }}><Notice tone={msg.tone}>{msg.text}</Notice></View>}
+            <Section title="هوية الفريق">
+              <TeamIdentity id={id} team={d.team} onSaved={() => { void page.reload(); void reloadMe(); }} />
+            </Section>
+
             <Section title="رمز الانضمام">
               <Card style={{ padding: 16, gap: 12, alignItems: 'center' }}>
                 <T v="num" size={34} style={{ letterSpacing: 6 }} center selectable>{joinCode ?? '——'}</T>
@@ -315,5 +327,90 @@ export function TeamManageScreen({ id }: { id: number }) {
         )}
       </ScrollPage>
     </View>
+  );
+}
+
+type Pic = { uri: string; id: number | null } | null;
+
+/**
+ * هوية الفريق (الجلسة 12): شعار الفريق، واسم صاحب الفريق أو المؤثر أو صاحب الصفحة وصورته الشخصية.
+ * تظهر في جداول الترتيب وشجرة التأهل وصفحة الفريق. الصورة تُرفع أولاً ثم تُحفظ مع الفريق.
+ */
+function TeamIdentity({ id, team, onSaved }: { id: number; team: TeamDetail; onSaved: () => void }) {
+  const { c } = useTheme();
+  const [logo, setLogo] = useState<Pic>(null);
+  const [photo, setPhoto] = useState<Pic>(null);
+  const [ownerName, setOwnerName] = useState(team.ownerName ?? '');
+  const [busy, setBusy] = useState<'logo' | 'photo' | 'save' | null>(null);
+  const [msg, setMsg] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
+  const pick = async (which: 'logo' | 'photo') => {
+    setMsg(null);
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) { setMsg({ tone: 'error', text: 'اسمح للتطبيق بالوصول إلى الصور من إعدادات الهاتف.' }); return; }
+      const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, allowsEditing: true, aspect: [1, 1] });
+      if (r.canceled || !r.assets?.[0]) return;
+      const uri = r.assets[0].uri;
+      const set = which === 'logo' ? setLogo : setPhoto;
+      set({ uri, id: null });
+      setBusy(which);
+      const up = await uploadImage(uri, 'private');
+      set({ uri, id: up.id });
+    } catch (e) {
+      (which === 'logo' ? setLogo : setPhoto)(null);
+      setMsg({ tone: 'error', text: errMsg(e) });
+    } finally { setBusy(null); }
+  };
+
+  const save = async (body: Record<string, unknown>, ok: string) => {
+    setMsg(null); setBusy('save');
+    try {
+      await api(`/teams/${id}`, { method: 'PATCH', body });
+      setLogo(null); setPhoto(null);
+      setMsg({ tone: 'ok', text: ok });
+      onSaved();
+    } catch (e) { setMsg({ tone: 'error', text: errMsg(e) }); } finally { setBusy(null); }
+  };
+
+  const nameChanged = ownerName.trim() !== (team.ownerName ?? '');
+  const dirty = !!logo?.id || !!photo?.id || nameChanged;
+  const body: Record<string, unknown> = {};
+  if (logo?.id) body.logoMediaId = logo.id;
+  if (photo?.id) body.ownerPhotoMediaId = photo.id;
+  if (nameChanged) body.ownerName = ownerName.trim() || null;
+
+  const tile = (which: 'logo' | 'photo', title: string, hint: string) => {
+    const local = which === 'logo' ? logo : photo;
+    const saved = which === 'logo' ? team.logoUrl : team.ownerPhotoUrl;
+    return (
+      <Pressable onPress={() => void pick(which)} accessibilityRole="button" accessibilityLabel={title}
+        style={{ flex: 1, alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: c.border }}>
+        {local ? (
+          which === 'logo' ? <Crest name={team.nameAr} uri={local.uri} size={72} /> : <Avatar uri={local.uri} size={72} />
+        ) : which === 'logo' ? <Crest name={team.nameAr} uri={saved} size={72} /> : <Avatar uri={saved} size={72} name={team.ownerName} />}
+        <T v="smallB" center>{title}</T>
+        <T v="tiny" muted center>{busy === which ? 'جارٍ الرفع…' : local?.id ? 'جاهزة — اضغط «احفظ»' : saved ? 'اضغط لتغييرها' : hint}</T>
+      </Pressable>
+    );
+  };
+
+  return (
+    <Card style={{ padding: 16, gap: 12 }}>
+      {msg && <Notice tone={msg.tone}>{msg.text}</Notice>}
+      <View style={{ flexDirection: row, gap: 10 }}>
+        {tile('logo', 'شعار الفريق', 'صورة مربعة')}
+        {tile('photo', 'صورة صاحب الفريق', 'المؤثر أو صاحب الصفحة')}
+      </View>
+      <Field label="اسم صاحب الفريق (اختياري)" value={ownerName} onChangeText={setOwnerName} maxLength={60}
+        placeholder="مثال: اسم المؤثر أو صاحب الصفحة" hint="يظهر تحت اسم الفريق في الترتيب، ومع صورته." />
+      <Button title="احفظ الهوية" icon="check" small busy={busy === 'save'} disabled={!dirty || busy !== null} onPress={() => void save(body, 'حُفظت هوية الفريق، وتظهر في الترتيب.')} />
+      {(team.logoUrl || team.ownerPhotoUrl) && (
+        <View style={{ flexDirection: row, gap: 8 }}>
+          {team.logoUrl ? <Button title="احذف الشعار" kind="light" small style={{ flex: 1 }} onPress={() => Alert.alert('حذف شعار الفريق؟', undefined, [{ text: 'إلغاء', style: 'cancel' }, { text: 'احذف', style: 'destructive', onPress: () => void save({ logoMediaId: null }, 'حُذف الشعار.') }])} /> : null}
+          {team.ownerPhotoUrl ? <Button title="احذف الصورة" kind="light" small style={{ flex: 1 }} onPress={() => Alert.alert('حذف صورة صاحب الفريق؟', undefined, [{ text: 'إلغاء', style: 'cancel' }, { text: 'احذف', style: 'destructive', onPress: () => void save({ ownerPhotoMediaId: null }, 'حُذفت الصورة.') }])} /> : null}
+        </View>
+      )}
+    </Card>
   );
 }
