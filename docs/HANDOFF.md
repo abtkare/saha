@@ -171,6 +171,12 @@
 - **باقٍ على المالك:** (1) Update لـ `saha-stack` في Docker Manager (الجلسة لا تصل إلى لوحة هوستنجر). التحقق من Safari: `https://saha.72-61-18-234.sslip.io/api/v1/tournaments/baghdad-sahat-2026/road` يعيد نصاً فيه `bracket`. (2) تحديث التطبيق من TestFlight ← فريقي ← فريقك ← «هوية الفريق» ← بطولة ← «الترتيب».
 - **ملاحظة:** شاشة الترتيب في التطبيق تحتاج تحديث السيرفر؛ قبل Update تظهر «الترتيب يظهر بعد القرعة».
 
+## الجلسة 13 — تحديث تلقائي للسيرفر ⏳ (2026-11-25)
+- **السبب:** المالك فتح `/api/v1/tournaments/baghdad-sahat-2026/road` فجاءه 404 = السيرفر لم يُحدَّث بعد الجلسة 12، وطلب أن تُنفَّذ كل الخطوات دونه. الجلسة لا تصل إلى لوحة هوستنجر.
+- **الحل:** خدمة ثالثة في `saha-ops` اسمها `saha-updater` (watchtower، الصورة `nickfedor/watchtower`) تفحص كل 5 دقائق صورتي `saha-api` و`saha-web` وتعيد إنشاء هاتين الحاويتين فقط عند صدور نسخة أحدث. لا تلمس saha-db/saha-redis ولا أي مشروع آخر.
+- **مرة واحدة أخيرة على المالك:** (1) Docker Manager ← `saha-stack` ← ⋮ ← **Update** (تصل الجلسة 12 + الملف الجديد لـ saha-ops). (2) Docker Manager ← `saha-ops` ← ⋮ ← **Update** (يُنشئ saha-updater). بعدها كل دمج على main يصل للسيرفر تلقائياً خلال ~5 دقائق من انتهاء بناء الصور — لا زر Update بعد اليوم.
+- إن لم يعمل Update لـ saha-ops (لا يعيد جلب الرابط): احذف مشروع saha-ops ← Compose from URL بالرابط `http://72.61.18.234:8098/ops/saha-ops.yml` باسم `saha-ops` (saha-edge تعيد ضبط HTTPS بأمان كما في الجلسة 9).
+
 ## تشغيل saha-ops من Docker Manager (بعد دمج PR الجلسة 9 وانتهاء البناء)
 1. Docker Manager ← Projects ← **`saha-stack`** ← ⋮ ← **Update** (ليصل الرابط الجديد للموقع). تحقق من Safari: http://72.61.18.234:8098/ops/saha-ops.yml يعرض نصاً يبدأ بـ «# «ساحة» — مشروع saha-ops».
 2. Docker Manager ← **Compose** ← **Compose from URL** ← الرابط: `http://72.61.18.234:8098/ops/saha-ops.yml` ← اسم المشروع: `saha-ops` ← **Deploy**.
