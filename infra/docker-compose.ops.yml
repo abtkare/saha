@@ -77,6 +77,24 @@ services:
     healthcheck: { disable: true }
     mem_limit: 64m
 
+  # تحديث تلقائي (الجلسة 13): كل 5 دقائق يفحص صورتي saha-api وsaha-web على ghcr، وإن وُجدت نسخة أحدث
+  # (بعد دمج PR وانتهاء البناء) يعيد إنشاء الحاويتين saha-api وsaha-web وحدهما بنفس إعداداتهما — بلا زر Update.
+  # يراقب بالاسم فقط هاتين الحاويتين: لا يلمس saha-db ولا saha-redis ولا أي مشروع آخر («خصوصي»، «مشاوي»…).
+  # الـ migrations تُطبَّق تلقائياً عند تشغيل saha-api الجديدة كما في Update. سجلّه: saha-ops ← saha-updater ← Logs.
+  updater:
+    image: nickfedor/watchtower:latest
+    container_name: saha-updater
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      TZ: Asia/Baghdad
+      WATCHTOWER_POLL_INTERVAL: "300"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "false"
+    command: ["saha-api", "saha-web"]
+    mem_limit: 64m
+
 networks:
   saha_net:
     name: saha_net
