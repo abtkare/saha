@@ -1,6 +1,6 @@
 # ملف تسليم الجلسة — مشروع «ساحة»
 
-آخر تحديث: 2026-11-25 06:20 (الجلسة 10 — TestFlight ✅)
+آخر تحديث: 2026-11-25 07:25 (نهاية الجلسة 10 — التطبيق مثبّت من TestFlight)
 
 ## المشروع باختصار
 منصة «ساحة» (Saha) للبطولات الكروية: موقع + تطبيق + لوحة إدارة.
@@ -144,7 +144,8 @@
   - **أداة التثبيت على EAS:** بلا ملف قفل في `apps/mobile` يختار EAS yarn ويفشل بسبب `packageManager: pnpm` في الجذر. الحل: CI يحذف `package-lock.json` من `apps/mobile/.gitignore` ويضيفه مع `eas.json` المعدّل في commit محلي على المشغّل (أرشيف EAS يحترم .gitignore).
   - عند فشل البناء تطبع خطوة «سبب الفشل من سجل EAS» آخر 200 سطر من سجل EAS (`.github/scripts/eas-log.mjs`) — الجلسة لا تصل إلى expo.dev.
   - ✅ (07:20) **المختبرون عبر API:** `testflight-testers.yml` + `.github/scripts/asc-testers.mjs` (تشغيل: الرفع على الفرع `testflight-testers` بـ commit بلا `[skip ci]`، والقائمة في `TESTER_EMAILS`). أُضيف alriyadagroup01@gmail.com إلى «Team (Expo)» (داخلية، كل النسخ) وأُرسلت الدعوة. بناء 8 = VALID. مستخدمو الفريق: devkaccount@icloud.com وmoayadqazas@icloud.com (ADMIN)، rezan1rezan2@gmail.com (APP_MANAGER)، alriyadagroup01 (ACCOUNT_HOLDER). ملاحظة: Safari على آيفون المالك يُدخله تلقائياً بـ appshoplive@gmail.com (ليس في الفريق) — كلمة سر حساب الشركة لم تنجح من Safari؛ لهذا صارت الإضافة عبر API.
-  - **باقٍ:** (1) المالك يفتح دعوة TestFlight في Gmail ‏alriyadagroup01 على الآيفون ويثبّت ويجرّب. (2) **إشعارات الهاتف في نسخة TestFlight لن تعمل** حتى يُرفع مفتاح APNs (.p8 من developer.apple.com ← Keys ← Apple Push Notifications service) إلى Expo (`eas credentials` أو صفحة Credentials في expo.dev) — في Expo Go تعمل كما هي. (3) مراجعة المتجر لاحقاً: لقطات، وصف، سياسة الخصوصية، تقييم العمر، ومتطلبات الصين يمكن تجاهلها باستبعاد الصين من التوزيع.
+  - ✅ (07:20) **المالك ثبّت التطبيق من TestFlight على آيفونه.** لديه ملاحظات على التطبيق تُنفَّذ في الجلسة 11.
+  - **باقٍ:** (1) دمج PR #14 (الفرع `testflight`). (1ب) ملاحظات المالك على نسخة TestFlight. (2) **إشعارات الهاتف في نسخة TestFlight لن تعمل** حتى يُرفع مفتاح APNs (.p8 من developer.apple.com ← Keys ← Apple Push Notifications service) إلى Expo (`eas credentials` أو صفحة Credentials في expo.dev) — في Expo Go تعمل كما هي. (3) مراجعة المتجر لاحقاً: لقطات، وصف، سياسة الخصوصية، تقييم العمر، ومتطلبات الصين يمكن تجاهلها باستبعاد الصين من التوزيع.
 - ملاحظة: الجلسة **لا تستطيع** قراءة/تشغيل مسارات GitHub Actions عبر البروكسي (`/actions/...` محجوب: المتغيرات والأسرار وworkflow_dispatch)، لكنها تقرأ نتائج check-runs وسجلات jobs عبر `/commits/<sha>/check-runs` و`/actions/jobs/<id>/logs`.
 - (قديم) المالك أكّد أن لديه حساب Apple Developer (2026-11-25). الخطة: سر واحد فقط في GitHub (`ASC_KEY_P8`)، والقيم غير السرية (Key ID، Issuer ID، Team ID، Apple ID للتطبيق، نوع الحساب) يرسلها المالك في المحادثة فتُكتب في `app-store.yml`.
 - ✅ **التطبيق صار على https:** القيمة الافتراضية لـ `SAHA_WEB_URL` في `app-update.yml` وبديل `src/config.ts` = `https://saha.72-61-18-234.sslip.io` (الجلسة لا تملك صلاحية متغيرات GitHub Actions، فغُيّرت القيمة في الملف).
