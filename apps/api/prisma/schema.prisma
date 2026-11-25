@@ -551,8 +551,31 @@ model Sponsor {
   slides  HeroSlide[]
   viewers UserRole[]
   requests SponsorRequest[]
+  banners  SponsorBanner[]
 
   @@map("sponsors")
+}
+
+/// الراعي الدائم (الجلسة 14): لوحة إعلان ثابتة تظهر دائماً في الرئيسية وصفحة البطولة (الموقع والتطبيق)
+/// خارج دوران الهيرو سلايدر. صورتها ورابطها يُغيَّران من اللوحة (مدير الرعاة).
+model SponsorBanner {
+  id          Int      @id @default(autoincrement())
+  sponsorId   Int?     @map("sponsor_id")
+  /// الوصف الظاهر لقارئ الشاشة وفي اللوحة (مثل «الراعي الماسي»)
+  labelAr     String   @map("label_ar")
+  /// /api/v1/media/:id لصورة رُفعت من اللوحة، أو صورة مدمجة في الموقع تبدأ بـ /sponsors/
+  imageUrl    String   @map("image_url")
+  linkUrl     String?  @map("link_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  updatedById Int?     @map("updated_by_id")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sponsor Sponsor? @relation(fields: [sponsorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([isActive, sortOrder])
+  @@map("sponsor_banners")
 }
 
 model HeroSlide {

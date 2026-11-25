@@ -6,7 +6,7 @@ import {
 } from '@saha/shared';
 import { api } from '../api';
 import { useAuth } from '../auth';
-import { MatchCard, TeamCell, TourCard } from '../components/cards';
+import { MatchCard, SponsorBanners, TeamCell, TourCard } from '../components/cards';
 import { RoadView } from './road';
 import { Icon } from '../components/icons';
 import { HeroBlock, TabHeader, TopBar } from '../components/layout';
@@ -16,7 +16,7 @@ import { errMsg, useLoad } from '../hooks';
 import { useNav } from '../nav';
 import { row, T, useTheme } from '../theme';
 import { ChipPicker } from './match';
-import type { MatchItem, Road, Scorer, TournamentDetail, TournamentSummary } from '../types';
+import type { Banner, MatchItem, Road, Scorer, TournamentDetail, TournamentSummary } from '../types';
 
 type KindFilter = 'all' | TournamentKind;
 const KIND_TABS: { key: KindFilter; label: string }[] = [{ key: 'all', label: 'الكل' }, ...TOURNAMENT_KINDS.map((k) => ({ key: k as KindFilter, label: TOURNAMENT_KIND_LABELS[k] }))];
@@ -62,11 +62,12 @@ export function TournamentScreen({ slug }: { slug: string }) {
   const [tab, setTab] = useState<Tab>('matches');
   const page = useLoad(async () => {
     const t = await api<TournamentDetail>(`/tournaments/${encodeURIComponent(slug)}`);
-    const [road, scorers] = await Promise.all([
+    const [road, scorers, banners] = await Promise.all([
       api<Road>(`/tournaments/${encodeURIComponent(t.slug)}/road`).catch(() => null),
       api<Scorer[]>(`/tournaments/${encodeURIComponent(t.slug)}/scorers`).catch(() => [] as Scorer[]),
+      api<{ banners: Banner[] }>('/home/banners').then((r) => r.banners).catch(() => null),
     ]);
-    return { t, road, scorers };
+    return { t, road, scorers, banners };
   }, [slug]);
   const d = page.data;
   const t = d?.t;
@@ -115,6 +116,7 @@ export function TournamentScreen({ slug }: { slug: string }) {
                 <Button title="ارعَ هذه البطولة" kind="light" icon="trophy" small onPress={() => push(me ? { name: 'sponsorRequest', tournamentId: t.id } : { name: 'login' })} />
               )}
             </HeroBlock>
+            {!!d.banners?.length && <View style={{ paddingHorizontal: 16, paddingTop: 16 }}><SponsorBanners banners={d.banners} /></View>}
 
             <View style={{ padding: 16, paddingBottom: 0 }}><Tabs items={TABS} value={tab} onChange={setTab} /></View>
 

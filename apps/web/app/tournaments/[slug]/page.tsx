@@ -4,12 +4,13 @@ import {
   TOURNAMENT_KIND_LABELS, TOURNAMENT_STATUS_LABELS, TOURNAMENT_FORMAT_LABELS, AGE_CATEGORY_LABELS,
   type TournamentKind, type TournamentStatus, type TournamentFormat, type AgeCategory,
 } from '@saha/shared';
-import { apiGet, type MatchItem, type Road, type Stars, type TeamRef } from '@/lib/api';
+import { apiGet, type Banner, type MatchItem, type Road, type Stars, type TeamRef } from '@/lib/api';
 import { shortDate } from '@/lib/format';
 import { Crest, EmptyCard, MatchCard } from '@/components/cards';
 import { Bracket, Champion, RoadTables, StarsBlock } from '@/components/road';
 import { PitchLines } from '@/components/mark';
 import { AppBand } from '@/components/app-band';
+import { SponsorBanners } from '@/components/sponsor-banners';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +33,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 /** صفحة البطولة — غير موجودة في المعاينة، مبنية من مكوناتها نفسها (الهيرو، بطاقة المباراة، الجدول، البطاقات) */
 export default async function TournamentPage({ params }: Props) {
   const { slug } = await params;
-  const [t, road, stars, scorers] = await Promise.all([
+  const [t, road, stars, scorers, banners] = await Promise.all([
     apiGet<TournamentDetail>(`/tournaments/${encodeURIComponent(slug)}`),
     apiGet<Road>(`/tournaments/${encodeURIComponent(slug)}/road`),
     apiGet<Stars>(`/tournaments/${encodeURIComponent(slug)}/stars`),
     apiGet<{ player: { id: number; name: string }; team: TeamRef; goals: number }[]>(`/tournaments/${encodeURIComponent(slug)}/scorers`),
+    apiGet<{ banners: Banner[] }>('/home/banners'),
   ]);
   if (!t) notFound();
 
@@ -62,6 +64,8 @@ export default async function TournamentPage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      <SponsorBanners banners={banners?.banners} />
 
       <section className="wrap sec split">
         <div className="split-main">
