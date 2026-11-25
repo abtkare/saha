@@ -65,6 +65,7 @@ export async function unregisterPush() {
 export function pathFromData(data: Record<string, unknown> | null | undefined): string | null {
   if (!data) return null;
   const n = (k: string) => (typeof data[k] === 'number' ? (data[k] as number) : Number.isInteger(Number(data[k])) && data[k] != null ? Number(data[k]) : null);
+  if (n('sponsorRequestId')) return '/sponsor-requests';
   if (n('matchId')) return `/matches/${n('matchId')}`;
   if (n('tournamentId')) return `/tournaments/${n('tournamentId')}`;
   if (n('teamId')) return `/manage/${n('teamId')}`;

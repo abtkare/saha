@@ -16,6 +16,9 @@ import { baghdadToday } from '../matches/matches.service';
 import { assertAny, canAny, conflict, datetime, linkUrl, raced } from './common';
 
 type B = Record<string, unknown>;
+
+/** مدير عام بدخول TOTP */
+export const isSuperAdmin = (auth: AuthContext) => auth.mfa && auth.grants.some((g) => g.role === 'super_admin');
 type Ctx = { auth: AuthContext; ip: string };
 
 /** الشريحة «حيّة» الآن: منشورة (أي معتمدة) وداخل فترة عرضها */
@@ -271,11 +274,13 @@ export class SlidesService {
     const cur = await this.load(id);
     if (cur.status !== 'review') throw conflict('NOT_IN_REVIEW', 'تُعتمد الشريحة وهي «قيد المراجعة» فقط.');
     const paid = PAID_SLIDE_TYPES.includes(cur.type);
-    if (paid && (cur.createdById === ctx.auth.userId || cur.updatedById === ctx.auth.userId)) {
+    const own = cur.createdById === ctx.auth.userId || cur.updatedById === ctx.auth.userId;
+    // المدير العام وحده يعتمد شريحة مدفوعة كتبها بنفسه (يُسجَّل selfApproved في سجل التدقيق)
+    if (paid && own && !isSuperAdmin(ctx.auth)) {
       throw conflict('SELF_APPROVAL', 'الشريحة المدفوعة يعتمدها شخص غير الذي أنشأها أو عدّلها.');
     }
     if (cur.endsAt && cur.endsAt <= new Date()) throw conflict('WINDOW_ENDED', 'انتهت فترة عرض الشريحة. عدّلها قبل الاعتماد.');
-    return this.transition(id, cur, { status: 'published', approvedById: ctx.auth.userId, approvedAt: new Date(), reviewNote: null }, 'slide.approve', ctx, { paid });
+    return this.transition(id, cur, { status: 'published', approvedById: ctx.auth.userId, approvedAt: new Date(), reviewNote: null }, 'slide.approve', ctx, { paid, selfApproved: paid && own });
   }
 
   async reject(id: number, body: B, ctx: Ctx) {

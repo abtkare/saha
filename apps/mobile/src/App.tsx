@@ -22,6 +22,7 @@ import { MatchScreen, ResultScreen } from './screens/match';
 import { NewsScreen, PostScreen, StaticPageScreen } from './screens/news';
 import { CreateTeamScreen, JoinTeamScreen, MyTeamsScreen, TeamManageScreen, TeamScreen } from './screens/teams';
 import { TournamentScreen, TournamentsScreen } from './screens/tournaments';
+import { SponsorRequestScreen, SponsorRequestsScreen } from './screens/sponsor';
 
 const FONT_FILES = {
   Cairo_700Bold: 'Cairo_700Bold.ttf',
@@ -57,6 +58,8 @@ function RouteScreen({ route }: { route: Route }) {
     case 'createTeam': return <CreateTeamScreen />;
     case 'joinTeam': return <JoinTeamScreen />;
     case 'search': return <SearchScreen />;
+    case 'sponsorRequest': return <SponsorRequestScreen tournamentId={route.tournamentId} matchId={route.matchId} />;
+    case 'sponsorRequests': return <SponsorRequestsScreen />;
     case 'page': return <StaticPageScreen slug={route.slug} />;
   }
 }

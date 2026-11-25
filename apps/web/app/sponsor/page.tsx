@@ -21,6 +21,13 @@ export default function SponsorPage() {
           <div className="grid g240">
             {OFFERS.map(([t, d]) => <div key={t} className="card feature"><span className="badge gold">برعاية</span><h3>{t}</h3><p className="muted">{d}</p></div>)}
           </div>
+          <div className="band light">
+            <div className="band-text">
+              <h2>ارعَ بطولة أو مباراة الآن</h2>
+              <p>اختر الحدث وارفع صورة شريحتك ومدة العرض، وتصلك الموافقة بإشعار.</p>
+            </div>
+            <a href="/sponsor/request" className="btn btn-primary">اطلب رعاية حدث</a>
+          </div>
           <div className="band dark">
             <div className="band-text">
               <h2>راعٍ حالي؟</h2>

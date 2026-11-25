@@ -110,6 +110,9 @@ export function TournamentScreen({ slug }: { slug: string }) {
               {canRegister && <Button title="سجّل فريقك" kind="gold" icon="plus" onPress={register} />}
               {t.status === 'registration' && !me && <Button title="سجّل فريقك" kind="gold" icon="plus" onPress={() => push({ name: 'login' })} />}
               {t.status === 'registration' && !!me && teams.length === 0 && <Button title="أنشئ فريقاً لتسجّله" kind="gold" icon="plus" onPress={() => push({ name: 'createTeam' })} />}
+              {(t.status === 'registration' || t.status === 'running') && (
+                <Button title="ارعَ هذه البطولة" kind="light" icon="trophy" small onPress={() => push(me ? { name: 'sponsorRequest', tournamentId: t.id } : { name: 'login' })} />
+              )}
             </HeroBlock>
 
             <View style={{ padding: 16, paddingBottom: 0 }}><Tabs items={TABS} value={tab} onChange={setTab} /></View>

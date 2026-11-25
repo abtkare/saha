@@ -198,6 +198,8 @@ model User {
   mediaAssets         MediaAsset[]
   notifications       Notification[]
   pushTokens          PushToken[]
+  sponsorRequests     SponsorRequest[]          @relation("SponsorRequester")
+  handledSponsorRequests SponsorRequest[]       @relation("SponsorRequestHandler")
 
   @@index([guardianId])
   @@map("users")
@@ -306,6 +308,7 @@ model Tournament {
   matches       Match[]
   roles         UserRole[]
   heroSlides    HeroSlide[]
+  sponsorRequests SponsorRequest[]
 
   @@index([kind, status])
   @@index([communityId, communityKind])
@@ -458,6 +461,7 @@ model Match {
   events     MatchEvent[]
   disputes   Dispute[]
   heroSlides HeroSlide[]
+  sponsorRequests SponsorRequest[]
 
   @@index([tournamentId])
   @@index([kickoffAt])
@@ -543,6 +547,7 @@ model Sponsor {
 
   slides  HeroSlide[]
   viewers UserRole[]
+  requests SponsorRequest[]
 
   @@map("sponsors")
 }
@@ -578,6 +583,7 @@ model HeroSlide {
   createdBy  User?        @relation("SlideCreator", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
   updatedBy  User?        @relation("SlideEditor", fields: [updatedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
   events     SlideEvent[]
+  sponsorRequest SponsorRequest?
 
   @@index([status, priority])
   @@index([sponsorId])
@@ -620,6 +626,45 @@ model SponsorLead {
   @@map("sponsor_leads")
 }
 
+/// طلب رعاية حدث (الجلسة 11): مستخدم مسجّل يطلب ظهور شريحته في السلايدر خلال بطولة أو مباراة.
+/// القبول من مدير الرعاة يُنشئ الراعي (أو يربطه) وشريحة «راعٍ» كاتبها صاحب الطلب، ويمنحه بوابة الراعي.
+model SponsorRequest {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  /// يُحدَّد عند القبول (راعٍ موجود أو جديد باسم الجهة)
+  sponsorId    Int?      @map("sponsor_id")
+  orgName      String    @map("org_name")
+  tournamentId Int       @map("tournament_id")
+  matchId      Int?      @map("match_id")
+  titleAr      String    @map("title_ar")
+  subtitleAr   String?   @map("subtitle_ar")
+  imageMediaId Int?      @map("image_media_id")
+  linkUrl      String?   @map("link_url")
+  /// مدة العرض المطلوبة بالأيام (7 أو 14 أو 30) تبدأ من القبول
+  days         Int
+  message      String?
+  /// pending | accepted | rejected | cancelled
+  status       String    @default("pending")
+  reviewNote   String?   @map("review_note")
+  slideId      Int?      @unique @map("slide_id")
+  handledById  Int?      @map("handled_by_id")
+  handledAt    DateTime? @map("handled_at") @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user       User        @relation("SponsorRequester", fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  handledBy  User?       @relation("SponsorRequestHandler", fields: [handledById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sponsor    Sponsor?    @relation(fields: [sponsorId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tournament Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  match      Match?      @relation(fields: [matchId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  image      MediaAsset? @relation(fields: [imageMediaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  slide      HeroSlide?  @relation(fields: [slideId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@map("sponsor_requests")
+}
+
 // ───────────── المحتوى ─────────────
 
 model Post {
@@ -658,6 +703,7 @@ model MediaAsset {
 
   uploadedBy User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
   sheetFor   Match[]
+  sponsorRequests SponsorRequest[]
 
   @@index([uploadedById, createdAt])
   @@map("media_assets")
