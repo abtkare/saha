@@ -12,6 +12,7 @@ export const TABS: TabName[] = ['home', 'tournaments', 'myteams', 'news', 'accou
 
 export type Route =
   | { name: 'tournament'; slug: string }
+  | { name: 'stars'; slug: string }
   | { name: 'match'; id: number }
   | { name: 'team'; id: number }
   | { name: 'post'; slug: string }
@@ -49,11 +50,11 @@ export const useNav = () => {
 /** تحويل مسار (من الموقع أو من رابط Expo بعد /--/) إلى تبويب وشاشة */
 export function routeFromPath(path: string): { tab?: TabName; route?: Route } | null {
   const clean = path.replace(/^\/+/, '').replace(/[?#].*$/, '').replace(/\/+$/, '');
-  const [a, b] = clean.split('/').map((x) => decodeURIComponent(x));
+  const [a, b, c] = clean.split('/').map((x) => decodeURIComponent(x));
   const id = Number(b);
   switch (a) {
     case '': case 'home': return { tab: 'home' };
-    case 'tournaments': return b ? { tab: 'tournaments', route: { name: 'tournament', slug: b } } : { tab: 'tournaments' };
+    case 'tournaments': return b ? { tab: 'tournaments', route: c === 'stars' ? { name: 'stars', slug: b } : { name: 'tournament', slug: b } } : { tab: 'tournaments' };
     case 'tournament': return b ? { tab: 'tournaments', route: { name: 'tournament', slug: b } } : null;
     case 'matches': case 'match': return Number.isInteger(id) && id > 0 ? { route: { name: 'match', id } } : null;
     case 'teams': case 'team': return Number.isInteger(id) && id > 0 ? { route: { name: 'team', id } } : null;

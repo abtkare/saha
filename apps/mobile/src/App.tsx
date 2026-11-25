@@ -22,6 +22,7 @@ import { MatchScreen, ResultScreen } from './screens/match';
 import { NewsScreen, PostScreen, StaticPageScreen } from './screens/news';
 import { CreateTeamScreen, JoinTeamScreen, MyTeamsScreen, TeamManageScreen, TeamScreen } from './screens/teams';
 import { TournamentScreen, TournamentsScreen } from './screens/tournaments';
+import { StarsScreen } from './screens/road';
 import { SponsorRequestScreen, SponsorRequestsScreen } from './screens/sponsor';
 
 const FONT_FILES = {
@@ -47,6 +48,7 @@ function TabRoot({ tab }: { tab: TabName }) {
 function RouteScreen({ route }: { route: Route }) {
   switch (route.name) {
     case 'tournament': return <TournamentScreen slug={route.slug} />;
+    case 'stars': return <StarsScreen slug={route.slug} />;
     case 'match': return <MatchScreen id={route.id} />;
     case 'team': return <TeamScreen id={route.id} />;
     case 'post': return <PostScreen slug={route.slug} />;

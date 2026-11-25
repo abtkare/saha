@@ -230,3 +230,59 @@ a.team{color:inherit}
 .try-app h2{font-size:24px}
 .try-app .steps{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:8px;line-height:1.7}
 .try-app code{font-size:13px;background:var(--color-bg);padding:2px 6px;border-radius:6px;word-break:break-all}
+
+/* ───── الجلسة 12: شعار الفريق وصورة صاحبه، طريق التأهل، أفضل اللاعبين ───── */
+.crest.sm{width:30px;height:30px;font-size:13px;flex:none}
+.crest.has-img{background:#fff;border:1px solid #EFEBE2;overflow:hidden;padding:0}
+.crest.has-img img{width:100%;height:100%;object-fit:cover;display:block}
+.crest.empty{background:transparent;border:1px dashed var(--color-border)}
+.team-cell{display:flex;align-items:center;gap:10px;min-width:150px}
+.crest-wrap{position:relative;flex:none;padding-inline-end:6px;padding-bottom:4px}
+.owner-badge{position:absolute;bottom:0;inset-inline-end:0;width:18px;height:18px;border-radius:999px;border:2px solid #F2B705;object-fit:cover;background:#fff}
+.team-cell-name{display:flex;flex-direction:column;line-height:1.3;min-width:0}
+.team-cell-name small{font-size:12px;font-weight:500}
+.table tr.qualify td{background:rgba(11,110,79,.04)}
+.table tr.qualify td:first-child{box-shadow:inset -3px 0 0 var(--color-primary)}
+.zone-legend{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--color-muted);margin:0}
+.zone-legend i{width:10px;height:10px;border-radius:2px;background:var(--color-primary);display:inline-block}
+.stage-progress{padding:14px;display:flex;flex-direction:column;gap:8px}
+.champion{background:#0E1A24;color:#fff;border:2px solid #F2B705;border-radius:16px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.champion svg{width:36px;height:36px;color:#F2B705}
+.champion b{font-family:var(--font-display);font-size:22px}
+.champion small{color:#C9D3D9}
+.muted-gold{color:#F2B705;font-size:13px}
+.owner-photo{width:48px;height:48px;border-radius:999px;border:2px solid #F2B705;object-fit:cover}
+.bracket{display:flex;gap:14px;padding-bottom:8px;--slot:96px}
+.b-col{display:flex;flex-direction:column;gap:10px;align-items:stretch;min-width:210px;flex:1}
+.b-col > .kind{align-self:center}
+.b-col.final > .kind{background:#FFF6D6;color:#7A5B00}
+.b-matches{display:flex;flex-direction:column;justify-content:space-around;gap:12px;min-height:calc(var(--rows) * var(--slot))}
+.b-match{padding:8px 12px;display:flex;flex-direction:column;gap:2px;color:inherit;text-decoration:none}
+.b-col.final .b-match{border:2px solid #F2B705}
+.slot{display:flex;align-items:center;gap:8px;min-height:34px}
+.slot + .slot{border-top:1px solid #EFEBE2}
+.slot-name{flex:1;display:flex;flex-direction:column;line-height:1.25;min-width:0}
+.slot-name b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot-name small{font-size:11px}
+.slot.won b,.slot.won .num{color:var(--color-primary)}
+.slot.lost{opacity:.5}
+.stars{display:flex;flex-direction:column;gap:14px}
+.podium-card{padding:20px;background:var(--color-primary);color:#fff;display:flex;flex-direction:column;gap:14px;align-items:center}
+.podium-card h3{color:#fff;font-size:20px}
+.podium-card .muted{color:#DCEDE6}
+.podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;width:100%;max-width:460px}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.step .p-name{display:flex;flex-direction:column}
+.step .p-name small{color:#DCEDE6}
+.step .block{align-self:stretch;background:rgba(255,255,255,.14);border-radius:10px 10px 0 0;border-top:3px solid #C98A4B;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:56px}
+.step.r1 .block{height:96px;border-top-color:#F2B705}
+.step.r2 .block{height:72px;border-top-color:#B8C2CA}
+.step .block .num{font-size:24px;font-weight:800}
+.step.r1 .block .num{color:#F2B705}
+.small-note{font-size:13px;margin:0}
+[data-theme='dark'] .slot + .slot{border-top-color:var(--color-border)}
+[data-theme='dark'] .crest.has-img{border-color:var(--color-border)}
+[data-theme='dark'] .table tr.qualify td{background:rgba(47,163,122,.08)}
+[data-theme='dark'] .b-col.final > .kind{background:rgba(242,183,5,.14);color:#F2B705}
+.team-owner{display:flex;align-items:center;gap:10px;margin:4px 0 8px;color:#DCEDE6;font-weight:600}
+.team-owner .owner-photo{width:36px;height:36px}

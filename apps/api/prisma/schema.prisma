@@ -319,6 +319,9 @@ model Team {
   id           Int           @id @default(autoincrement())
   nameAr       String        @map("name_ar")
   logoUrl      String?       @map("logo_url")
+  /// صاحب الفريق أو المؤثر أو صاحب الصفحة: اسمه وصورته الشخصية (الجلسة 12)
+  ownerName     String?      @map("owner_name")
+  ownerPhotoUrl String?      @map("owner_photo_url")
   city         String?
   managerId    Int           @map("manager_id")
   communityId  Int?          @map("community_id")

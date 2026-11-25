@@ -1,21 +1,22 @@
 /** البطولات: القائمة بفلتر الأنواع الثلاثة، وصفحة البطولة بتبويبات المباريات/الترتيب/الفرق/الهدافون */
 import { useMemo, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import {
   AGE_CATEGORY_LABELS, STAGE_LABELS, TOURNAMENT_FORMAT_LABELS, TOURNAMENT_KINDS, TOURNAMENT_KIND_LABELS, TOURNAMENT_STATUS_LABELS, type TournamentKind,
 } from '@saha/shared';
 import { api } from '../api';
 import { useAuth } from '../auth';
-import { MatchCard, StandingsTable, TourCard } from '../components/cards';
+import { MatchCard, TeamCell, TourCard } from '../components/cards';
+import { RoadView } from './road';
 import { Icon } from '../components/icons';
 import { HeroBlock, TabHeader, TopBar } from '../components/layout';
-import { Button, Card, Chip, Empty, ErrorBox, Loading, Notice, ScrollPage, Section, Tabs, ListRow, Divider } from '../components/ui';
+import { Button, Card, Chip, Crest, Empty, ErrorBox, Loading, ScrollPage, Section, Tabs, Divider } from '../components/ui';
 import { kickoffDay, shortDate } from '../format';
 import { errMsg, useLoad } from '../hooks';
 import { useNav } from '../nav';
 import { row, T, useTheme } from '../theme';
 import { ChipPicker } from './match';
-import type { MatchItem, Scorer, Standings, TournamentDetail, TournamentSummary } from '../types';
+import type { MatchItem, Road, Scorer, TournamentDetail, TournamentSummary } from '../types';
 
 type KindFilter = 'all' | TournamentKind;
 const KIND_TABS: { key: KindFilter; label: string }[] = [{ key: 'all', label: 'الكل' }, ...TOURNAMENT_KINDS.map((k) => ({ key: k as KindFilter, label: TOURNAMENT_KIND_LABELS[k] }))];
@@ -61,11 +62,11 @@ export function TournamentScreen({ slug }: { slug: string }) {
   const [tab, setTab] = useState<Tab>('matches');
   const page = useLoad(async () => {
     const t = await api<TournamentDetail>(`/tournaments/${encodeURIComponent(slug)}`);
-    const [standings, scorers] = await Promise.all([
-      api<Standings>(`/tournaments/${encodeURIComponent(t.slug)}/standings`).catch(() => null),
+    const [road, scorers] = await Promise.all([
+      api<Road>(`/tournaments/${encodeURIComponent(t.slug)}/road`).catch(() => null),
       api<Scorer[]>(`/tournaments/${encodeURIComponent(t.slug)}/scorers`).catch(() => [] as Scorer[]),
     ]);
-    return { t, standings, scorers };
+    return { t, road, scorers };
   }, [slug]);
   const d = page.data;
   const t = d?.t;
@@ -125,17 +126,7 @@ export function TournamentScreen({ slug }: { slug: string }) {
               )) : <Section><Empty icon="clock">لم تُجدول المباريات بعد.</Empty></Section>
             )}
 
-            {tab === 'table' && (
-              <Section style={{ paddingTop: 16 }}>
-                {d.standings?.groups?.length ? d.standings.groups.map((g) => (
-                  <View key={g.label} style={{ gap: 8 }}>
-                    <T v="h3">{`المجموعة ${g.label}`}</T>
-                    <StandingsTable rows={g.rows} full />
-                  </View>
-                )) : d.standings ? <StandingsTable rows={d.standings.rows} full /> : <Empty icon="trophy">الترتيب يظهر بعد القرعة.</Empty>}
-                <Notice>الترتيب يحسب النتائج المعتمدة والنهائية فقط؛ المؤقتة والمتنازع عليها لا تدخل.</Notice>
-              </Section>
-            )}
+            {tab === 'table' && <RoadView road={d.road} slug={t.slug} />}
 
             {tab === 'teams' && (
               <Section style={{ paddingTop: 16 }}>
@@ -144,8 +135,11 @@ export function TournamentScreen({ slug }: { slug: string }) {
                     {t.registrations.map((r, i) => (
                       <View key={r.team.id}>
                         {i > 0 && <Divider />}
-                        <ListRow title={r.team.nameAr} icon="team" onPress={() => push({ name: 'team', id: r.team.id })}
-                          right={r.team.verifiedAt ? <Chip>موثّق</Chip> : undefined} />
+                        <Pressable onPress={() => push({ name: 'team', id: r.team.id })} accessibilityRole="button"
+                          style={{ flexDirection: row, alignItems: 'center', gap: 8, padding: 14 }}>
+                          <TeamCell team={r.team} size={36} />
+                          {r.team.verifiedAt ? <Chip>موثّق</Chip> : null}
+                        </Pressable>
                       </View>
                     ))}
                   </Card>
@@ -162,6 +156,7 @@ export function TournamentScreen({ slug }: { slug: string }) {
                         {i > 0 && <Divider />}
                         <View style={{ flexDirection: row, alignItems: 'center', gap: 12, padding: 14 }}>
                           <T v="num" size={15} style={{ width: 22 }}>{i + 1}</T>
+                          <Crest name={s.team.nameAr} uri={s.team.logoUrl} size={30} />
                           <View style={{ flex: 1 }}>
                             <T v="bodyB">{s.player.name}</T>
                             <T v="small" muted>{s.team.nameAr}</T>

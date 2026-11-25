@@ -148,6 +148,10 @@ jobs:
           curl -sf localhost:8098/tournaments/baghdad-sahat-2026 | grep -q "شباب الكرادة"
           curl -sf "localhost:8098/api/v1/matches" | grep -q homeTeam
           curl -sf "localhost:8098/api/v1/tournaments/baghdad-sahat-2026/standings" | grep -q points
+          # الجلسة 12: طريق التأهل وأفضل اللاعبين
+          curl -sf "localhost:8098/api/v1/tournaments/baghdad-sahat-2026/road" | grep -q '"bracket"'
+          curl -sf "localhost:8098/api/v1/tournaments/baghdad-sahat-2026/stars" | grep -q '"bestPlayers"'
+          curl -sf localhost:8098/tournaments/baghdad-sahat-2026 | grep -q 'أفضل اللاعبين'
           curl -sf "localhost:8098/api/v1/news" | grep -q saha-launch
           echo "$html" | grep -q 'class="splash'
           echo "$html" | grep -q 'البطولات الجارية'

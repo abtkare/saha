@@ -1,5 +1,5 @@
 import { RESULT_STATUS_LABELS, TOURNAMENT_KIND_LABELS, TOURNAMENT_FORMAT_LABELS } from '@saha/shared';
-import type { MatchItem, StandingRow, TournamentSummary, NewsItem } from '@/lib/api';
+import type { MatchItem, StandingRow, TeamRef, TournamentSummary, NewsItem, Zone } from '@/lib/api';
 import { initial, kickoffDay, kickoffTime, relativeTime, scoreText, signed, tournamentProgress } from '@/lib/format';
 import { Mark, Trophy } from './mark';
 
@@ -52,8 +52,29 @@ export function TourCard({ t }: { t: TournamentSummary }) {
   );
 }
 
-/** جدول الترتيب — .table من المعاينة. full = كل الأعمدة (صفحة البطولة) */
-export function StandingsTable({ rows, full = false }: { rows: StandingRow[]; full?: boolean }) {
+/** شعار الفريق: صورته إن رفعها منشئ الفريق، وإلا الحرف الأول (.crest) */
+export function Crest({ team, size }: { team: TeamRef; size?: 'sm' | 'lg' }) {
+  const cls = `crest${size ? ` ${size}` : ''}`;
+  return team.logoUrl
+    ? <span className={`${cls} has-img`}><img src={team.logoUrl} alt={`شعار ${team.nameAr}`} loading="lazy" /></span>
+    : <span className={cls}>{initial(team.nameAr)}</span>;
+}
+
+/** الفريق في صف الجدول: الشعار وعليه صورة صاحب الفريق/المؤثر بحد ذهبي، ثم الاسم واسم صاحبه */
+export function TeamCell({ team }: { team: TeamRef }) {
+  return (
+    <a href={`/teams/${team.id}`} className="plain team-cell">
+      <span className="crest-wrap">
+        <Crest team={team} size="sm" />
+        {team.ownerPhotoUrl && <img className="owner-badge" src={team.ownerPhotoUrl} alt={team.ownerName ? `صورة ${team.ownerName}` : ''} loading="lazy" />}
+      </span>
+      <span className="team-cell-name"><b>{team.nameAr}</b>{team.ownerName && <small className="muted">{team.ownerName}</small>}</span>
+    </a>
+  );
+}
+
+/** جدول الترتيب — .table من المعاينة. full = كل الأعمدة (صفحة البطولة). zone: منطقة التأهل (الجلسة 12) */
+export function StandingsTable({ rows, full = false }: { rows: (StandingRow & { zone?: Zone })[]; full?: boolean }) {
   return (
     <div className="card flush scroll-x">
       <table className="table">
@@ -66,16 +87,19 @@ export function StandingsTable({ rows, full = false }: { rows: StandingRow[]; fu
         </thead>
         <tbody>
           {rows.length === 0 && <tr><td colSpan={full ? 8 : 5} className="muted">لم تُعتمد فرق بعد.</td></tr>}
-          {rows.map((r, i) => (
-            <tr key={r.team.id} className={i === 0 && r.points > 0 ? 'first' : undefined}>
-              <td className="num">{r.position}</td>
-              <td><a href={`/teams/${r.team.id}`} className="plain">{r.team.nameAr}</a></td>
-              <td className="num">{r.played}</td>
-              {full && <><td className="num">{r.won}</td><td className="num">{r.drawn}</td><td className="num">{r.lost}</td></>}
-              <td className="num">{signed(r.goalDiff)}</td>
-              <td className="num pts">{r.points}</td>
-            </tr>
-          ))}
+          {rows.map((r, i) => {
+            const zone = r.zone !== undefined ? r.zone : i === 0 && r.points > 0 ? 'leader' : null;
+            return (
+              <tr key={r.team.id} className={zone === 'leader' ? 'first' : zone === 'qualify' ? 'qualify' : undefined}>
+                <td className="num">{r.position}</td>
+                <td><TeamCell team={r.team} /></td>
+                <td className="num">{r.played}</td>
+                {full && <><td className="num">{r.won}</td><td className="num">{r.drawn}</td><td className="num">{r.lost}</td></>}
+                <td className="num">{signed(r.goalDiff)}</td>
+                <td className="num pts">{r.points}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
