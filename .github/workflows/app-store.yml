@@ -63,7 +63,8 @@ jobs:
           eas whoami
           # EAS يختار أداة التثبيت من ملف القفل؛ بدونه يختار yarn ويفشل بسبب packageManager (pnpm) في جذر المستودع.
           # نُدخل package-lock.json وeas.json المعدّل في commit محلي على المشغّل فقط (لا يُرفع إلى GitHub).
-          git -c user.name=ci -c user.email=ci@saha.local add -f package-lock.json eas.json
+          sed -i '/^package-lock.json$/d' .gitignore
+          git -c user.name=ci -c user.email=ci@saha.local add -f package-lock.json eas.json .gitignore
           git -c user.name=ci -c user.email=ci@saha.local commit -qm "ci: ملف القفل لبناء EAS (محلي)"
       - name: البناء على خوادم Expo (نحو 20–40 دقيقة)
         run: eas build --platform ios --profile production --non-interactive --wait --json > build.json && cat build.json
