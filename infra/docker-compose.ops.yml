@@ -1,0 +1,83 @@
+# «ساحة» — مشروع saha-ops: النسخ الاحتياطي (saha-backup) وHTTPS (saha-edge) في مشروع مستقل عن saha-stack.
+#
+# لماذا مشروع منفصل: المالك ينشئه من Docker Manager بزر «Compose from URL» دون لصق ولا وكيل ولا تعديل على saha-stack.
+# الرابط العام لهذا الملف يقدّمه موقع ساحة نفسه: http://72.61.18.234:8098/ops/saha-ops.yml
+# (يُنسخ هذا الملف حرفياً إلى صورة saha-web عند البناء — لا أسرار فيه).
+#
+# يعتمد على saha-stack القائم:
+#   - الشبكة saha_net (خارجية) والقاعدة saha-db عليها.
+#   - ملف الأسرار /docker/saha-stack/.env (مسار مطلق؛ يُقرأ فقط ولا يُعدَّل).
+#   - الموقع على 127.0.0.1:8098.
+# لا يلمس أي حاوية أو مشروع آخر. «خصوصي» و«مشاوي» يفحصهما saha-edge قبل أي تغيير وبعده ويتراجع إن تأثرا.
+name: saha-ops
+
+services:
+  # نسخة احتياطية يومية للقاعدة (الساعة 03 بتوقيت بغداد) + نسخة عند أول تشغيل، وتُحذف الأقدم من 14 يوماً.
+  # الملفات: /docker/saha-stack/backups/saha-YYYY-MM-DD_HHMM.sql.gz — تظهر في مدير ملفات هوستنجر.
+  backup:
+    image: postgres:16-alpine
+    container_name: saha-backup
+    restart: unless-stopped
+    env_file: /docker/saha-stack/.env
+    environment:
+      TZ: Asia/Baghdad
+      PGHOST: saha-db
+      BACKUP_HOUR: "03"
+      BACKUP_KEEP_DAYS: "14"
+    volumes:
+      - /docker/saha-stack/backups:/backups
+    networks: [saha_net]
+    mem_limit: 128m
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -eu
+        export PGUSER="$$POSTGRES_USER" PGPASSWORD="$$POSTGRES_PASSWORD" PGDATABASE="$$POSTGRES_DB"
+        backup() {
+          f="/backups/saha-$$(date +%Y-%m-%d_%H%M).sql.gz"
+          if pg_dump --no-owner --clean --if-exists | gzip -9 > "$$f.part" && [ -s "$$f.part" ]; then
+            mv "$$f.part" "$$f"; echo "[$$(date '+%F %T')] ✅ نسخة احتياطية: $$f ($$(du -h "$$f" | cut -f1))"
+          else
+            rm -f "$$f.part"; echo "[$$(date '+%F %T')] ❌ فشل النسخ الاحتياطي"; return 1
+          fi
+          find /backups -name 'saha-*.sql.gz' -mtime +"$$BACKUP_KEEP_DAYS" -print -delete
+        }
+        # القاعدة في مشروع آخر (saha-stack) فلا يصلح depends_on — ننتظرها هنا
+        n=0; until pg_isready -q; do
+          n=$$((n+1)); [ "$$n" -eq 1 ] && echo "[$$(date '+%F %T')] أنتظر القاعدة $$PGHOST…"
+          sleep 5
+        done
+        [ "$${BACKUP_ONCE:-}" = 1 ] && { backup; exit $$?; }
+        echo "[$$(date '+%F %T')] النسخ الاحتياطي يعمل: يومياً الساعة $$BACKUP_HOUR:00 بتوقيت بغداد، والاحتفاظ $$BACKUP_KEEP_DAYS يوماً"
+        [ -n "$$(find /backups -name 'saha-*.sql.gz' -mtime -1 2>/dev/null)" ] || backup || true
+        while true; do
+          if [ "$$(date +%H)" = "$$BACKUP_HOUR" ] && ! ls /backups/saha-"$$(date +%Y-%m-%d)"_*.sql.gz >/dev/null 2>&1; then backup || true; fi
+          sleep 600
+        done
+
+  # HTTPS: يضيف لـ Nginx الموجود على السيرفر ملف موقع واحداً لساحة فقط، ويصدر شهادة Let's Encrypt ويجددها.
+  # يفحص كل المواقع الأخرى (خصوصي، مشاوي…) قبل كل تغيير وبعده، ويتراجع تلقائياً إن تأثر أي منها.
+  # الشرح الكامل في apps/api/ops/edge.sh. سجلّه: Docker Manager ← saha-ops ← saha-edge ← Logs.
+  edge:
+    image: ghcr.io/abtkare/saha-api:latest
+    pull_policy: always
+    container_name: saha-edge
+    restart: unless-stopped
+    privileged: true
+    pid: host
+    network_mode: host
+    environment:
+      SAHA_DOMAIN: saha.72-61-18-234.sslip.io
+      SAHA_UPSTREAM: 127.0.0.1:8098
+      SAHA_DIR: /docker/saha-stack
+      # طوارئ: يقدّم الموقع نسخة من هذا الملف فيها "1" على /ops/saha-ops-remove.yml
+      # (Compose from URL بها ← يحذف ملف ساحة من Nginx وحده ويعيده كما كان؛ ساحة تبقى على :8098)
+      SAHA_EDGE_REMOVE: "0"
+    entrypoint: ["bash", "/repo/apps/api/ops/edge.sh"]
+    healthcheck: { disable: true }
+    mem_limit: 64m
+
+networks:
+  saha_net:
+    name: saha_net
+    external: true

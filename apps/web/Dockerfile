@@ -8,6 +8,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY package.json pnpm-workspace.yaml turbo.json tsconfig.base.json pnpm-lock.yaml* ./
 COPY packages packages
 COPY apps/web apps/web
+# مشروع saha-ops (النسخ الاحتياطي + HTTPS) برابط عام لزر «Compose from URL» في Docker Manager — لا أسرار فيه
+COPY infra/docker-compose.ops.yml apps/web/public/ops/saha-ops.yml
+RUN sed 's/SAHA_EDGE_REMOVE: "0"/SAHA_EDGE_REMOVE: "1"/' apps/web/public/ops/saha-ops.yml > apps/web/public/ops/saha-ops-remove.yml \
+ && grep -q 'SAHA_EDGE_REMOVE: "1"' apps/web/public/ops/saha-ops-remove.yml
 RUN pnpm install --filter "@saha/web..." --no-frozen-lockfile
 RUN pnpm --filter @saha/shared build && pnpm --filter @saha/ui build && pnpm --filter @saha/web build
 

@@ -1,6 +1,6 @@
 # ملف تسليم الجلسة — مشروع «ساحة»
 
-آخر تحديث: 2026-11-25 (الجلسة 8)
+آخر تحديث: 2026-11-25 (الجلسة 9)
 
 ## المشروع باختصار
 منصة «ساحة» (Saha) للبطولات الكروية: موقع + تطبيق + لوحة إدارة.
@@ -126,6 +126,22 @@
 - ⏳ **HTTPS — حاوية `saha-edge`** (`apps/api/ops/edge.sh` داخل صورة saha-api، وخدمة `edge` في `infra/docker-compose.stack.yml`): privileged + `pid: host` وتنفّذ على السيرفر عبر `nsenter`. تضيف ملف موقع واحداً `/etc/nginx/conf.d/saha-sslip.conf` (أو sites-enabled) للنطاق `saha.72-61-18-234.sslip.io` ← `127.0.0.1:8098`، شهادة Let's Encrypt بحاوية certbot (webroot) في `/docker/saha-stack/letsencrypt`، وتجديد كل 12 ساعة. تفحص كل المواقع الأخرى (خصوصي/مشاوي) قبل وبعد، وتتراجع تلقائياً إن فشل `nginx -t` أو تغيّر رمز أي موقع، ولا تكتب فوق ملف ليس من صنعها. اختبار CI (nginx حقيقي على المشغّل + موقع «khousousi.test» على 80 و443 + تراجع + عدم الكتابة فوق ملف يدوي). ✅ (2026-11-25) **أُصلح:** رصد المواقع الأخرى كان يقرأ `server_name` في أول السطر فقط فلم يرصد الموقع المكتوب في سطر واحد — صار يرصده في أي مكان مع تجاهل التعليقات، والاختبار يشترط ظهور `khousousi.test http=200 https=200` في السجل.
 - ⏳ **النسخ الاحتياطي — خدمة `backup`** (postgres:16-alpine): نسخة عند أول تشغيل ثم يومياً 03:00 بغداد في `/docker/saha-stack/backups/saha-*.sql.gz`، الاحتفاظ 14 يوماً، `pg_dump --clean --if-exists`. اختبار CI (نسخ ← استرجاع في قاعدة جديدة ← مقارنة الأعداد ← `audit_verify()` ← استرجاع ثانٍ فوقها). ✅ (2026-11-25) **أُصلح:** سبب التعليق كان في الاختبار لا في ملف السيرفر — `docker compose config` يُبقي الهروب `$$` في ناتجه (Compose يفكّه عند التشغيل فقط)، فصار `$$` رقم العملية، ولم يتحقق شرط `BACKUP_ONCE` فدخل السكربت حلقة اليوم الكامل. الاختبار يفكّ `$$` الآن كما يفعل Compose ويتحقق منه، ومهلة 120 ثانية. نجح: نسخ ← استرجاع ← تطابق الأعداد ← `audit_verify()` ← استرجاع ثانٍ فوقها.
 - ✅ **TestFlight مجهّز:** `apps/mobile/eas.json` (profile `production`، `SAHA_STORE=1`)، أيقونة `apps/mobile/assets/icon.png`، نصوص الأذونات بالعربية، و`.github/workflows/app-store.yml` يدوي (بناء EAS ثم `eas submit`). **ينتظر من المالك:** حساب Apple Developer (99$ سنوياً)، تطبيق في App Store Connect بالمعرّف `app.saha.iq`، والأسرار: `ASC_KEY_P8`، `ASC_KEY_ID`، `ASC_ISSUER_ID`، `APPLE_TEAM_ID`، `ASC_APP_ID`. لم يُجرَّب بعد (غير مؤكد أن EAS ينشئ شهادات iOS دون تفاعل بمفتاح ASC). نسخة المتجر تستخدم https فيجب أن ينجح HTTPS أولاً.
+
+## الجلسة 9 — saha-ops ⏳ (2026-11-25)
+- **مشروع منفصل `saha-ops`** (`infra/docker-compose.ops.yml`): خدمتا `backup` و`edge` فقط، على الشبكة `saha_net`، أسرار القاعدة من `/docker/saha-stack/.env` (مسار مطلق، قراءة فقط)، النسخ في `/docker/saha-stack/backups`. لا يغيّر `saha-stack` إطلاقاً.
+- **الرابط العام** لزر Compose from URL يقدّمه موقع ساحة: `http://72.61.18.234:8098/ops/saha-ops.yml` (الملف يُنسخ إلى صورة saha-web عند البناء). نسخة الطوارئ: `/ops/saha-ops-remove.yml`.
+- أُزيلت `backup` و`edge` من `infra/docker-compose.stack.yml` (أربع خدمات) حتى لا تتكرر الأسماء.
+- الخطوات للمالك في القسم «تشغيل saha-ops من Docker Manager» أدناه.
+
+## تشغيل saha-ops من Docker Manager (بعد دمج PR الجلسة 9 وانتهاء البناء)
+1. Docker Manager ← Projects ← **`saha-stack`** ← ⋮ ← **Update** (ليصل الرابط الجديد للموقع). تحقق من Safari: http://72.61.18.234:8098/ops/saha-ops.yml يعرض نصاً يبدأ بـ «# «ساحة» — مشروع saha-ops».
+2. Docker Manager ← **Compose** ← **Compose from URL** ← الرابط: `http://72.61.18.234:8098/ops/saha-ops.yml` ← اسم المشروع: `saha-ops` ← **Deploy**.
+3. بعد دقيقتين: مشروع `saha-ops` فيه حاويتان: **saha-backup** و**saha-edge**. مشروع `saha-stack` يبقى بأربع حاويات كما هو.
+4. سجل `saha-edge` (Logs): «المواقع الأخرى قبل أي تغيير» ← «✅ الشهادة جاهزة» ← «🎉 ساحة على https://saha.72-61-18-234.sslip.io». إن ظهر ⛔ فلم يتغير شيء — انسخ السجل للجلسة.
+5. سجل `saha-backup`: «✅ نسخة احتياطية: /backups/saha-….sql.gz».
+6. Safari: https://saha.72-61-18-234.sslip.io/api/v1/health ← `ok`، **ثم افتح موقعي «خصوصي» و«مشاوي»**.
+7. **طوارئ** (إن تأثر أي موقع آخر لاحقاً): احذف مشروع `saha-ops` من Docker Manager ← Compose from URL بالرابط `http://72.61.18.234:8098/ops/saha-ops-remove.yml` باسم `saha-ops` ← تحذف saha-edge ملف ساحة وحده من Nginx. للرجوع: احذفه وأنشئه من الرابط العادي.
+- **إن رفض Docker Manager رابط http** (يشترط https): أخبر الجلسة — البديل نشر الملف نفسه على رابط https عام (مثلاً موقع Netlify صغير بحساب المالك).
 
 ## خطوات معلّقة (بالترتيب)
 1. ✅ (2026-11-23) المالك فتح `http://72.61.18.234:8098/api/v1/health` من Safari على الآيفون ← `ok` (المنفذ 8098 مفتوح من الخارج). ✅ تحديث الجلسة 3 وصل عبر زر Update في Docker Manager: رابط `/api/v1/tournaments/baghdad-sahat-2026/scorers` يعيد `[]`.
