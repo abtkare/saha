@@ -118,7 +118,7 @@
 
 > **⚠️ نتيجة التجربة على آيفون حقيقي (2026-11-24):** Expo Go وصل إلى `/expo` لكنه رفض الفتح برسالة «You need to be signed in to Expo Go and Expo CLI to open your project». السبب: على هاتف حقيقي وعبر الإنترنت (لا الشبكة المحلية) يشترط Expo Go أن يكون المشروع تابعاً لحساب Expo ومُوقَّعاً، وأن يكون المستخدم مسجلاً في Expo Go بنفس الحساب (المحاكي في CI يفتحه لأن العنوان محلي). **الحل في الجلسة 8 (أول مهمة):** نشر التطبيق بـ **EAS Update** من CI إلى حساب المالك في Expo، وفتحه في Expo Go بعد تسجيل الدخول فيه بنفس الحساب. يحتاج من المالك: حساب expo.dev مجاني، ومشروع `saha` (Project ID واسم الحساب)، و**Access Token** يُضاف في GitHub ← Settings ← Secrets and variables ← Actions باسم `EXPO_TOKEN`. نفس الحساب يفعّل إشعارات الهاتف أيضاً.
 
-## الجلسة 8 — النشر ⏳ (بدأت 2026-11-24، الفرع `session-8`، Pull Request رقم 9 — لم يُدمج بعد)
+## الجلسة 8 — النشر ⏳ (بدأت 2026-11-24؛ PR #9 وPR #10 مدموجان — انظر «حالة 2026-11-25 03:30» أدناه)
 - ✅ **EAS Update من CI:** `.github/workflows/app-update.yml` ينشر التطبيق إلى مشروع Expo «saha» (الحساب `appshoplive`، Project ID `e971c618-1a3d-49f3-8c3d-ddf5bd31ce29`، السر `EXPO_TOKEN` في GitHub). فرع `main` ← القناة `production`، فروع `session-*` ← القناة `preview`. الإعداد في `apps/mobile/app.config.js` (يُفعَّل بـ `SAHA_EAS=1`): owner وprojectId و`runtimeVersion: {policy: "sdkVersion"}` ← `exposdk:58.0.0` (**شرط Expo Go**؛ أول محاولة خرجت `0.7.0` ورُفضت). عنوان الموقع للتطبيق المنشور: `SAHA_WEB_URL` (حالياً `http://72.61.18.234:8098` — يُغيَّر إلى https بعد نجاح HTTPS). الروابط تُكتب في ملخص كل تشغيل (`scripts/eas-links.mjs`).
 - ✅ **(2026-11-25) المالك فتح التطبيق على آيفونه** في Expo Go (نسخة preview) بعد تسجيل الدخول بحساب appshoplive. ملاحظة: لصق رابط `exp://` في بحث Google لا يعمل؛ الطريقة: Expo Go ← Home ← Projects ← saha، أو https://expo.dev/accounts/appshoplive/projects/saha/updates ← Preview. صفحة `/app` في الموقع صار فيها زر لرابط القناة production (يعمل بعد الدمج).
 - ✅ **زر «أرسل إشعاراً تجريبياً»** في التطبيق (حسابي ← الإشعارات، يظهر بعد تفعيل إشعارات الهاتف): `POST /me/notifications/test` يكتب إشعاراً للمستخدم نفسه فترسله مهمة Expo Push خلال ثوانٍ، ويعيد عدد أجهزته (0 = الجهاز غير مسجل)، وحدّه 3 كل 10 دقائق. مختبر في `test/push.e2e.test.ts`.
@@ -150,6 +150,40 @@
 14. **دمج الجلسة 7 ثم تحديث السيرفر:** https://github.com/abtkare/saha/pull/7 ← **Merge pull request** ← **Confirm** ← انتظر نحو 10 دقائق (بناء الصور) ← Docker Manager ← `saha-stack` ← ⋮ ← **Update**. التحقق: ثبّت **Expo Go** من App Store، ثم افتح http://72.61.18.234:8098/app من Safari على الآيفون واضغط «افتح ساحة في Expo Go».
 15. ✅ (2026-11-24) حساب Expo `appshoplive` ومشروع saha والسر EXPO_TOKEN جاهزة. ~~لتفعيل إشعارات الهاتف:~~ حساب على https://expo.dev ← Create project باسم `saha` ← انسخ **Project ID** (بصيغة xxxxxxxx-xxxx-…) واسم الحساب، وأعطهما للجلسة القادمة لتضعهما في `apps/mobile/app.json` (لا حاجة لأي تعديل على السيرفر).
 16. **الجلسة 8 — إكمال:** ✅ (أ) أُصلح اختبار النسخ الاحتياطي ونجح CI كاملاً في PR #9. (ب) دمج PR #9 ثم تشغيل HTTPS والنسخ الاحتياطي على السيرفر — **الخطوات في القسم «تشغيل HTTPS والنسخ الاحتياطي من Docker Manager» أدناه**. (ج) بعد نجاح HTTPS: متغير المستودع `SAHA_WEB_URL` = `https://saha.72-61-18-234.sslip.io` (GitHub ← Settings ← Secrets and variables ← Actions ← Variables) ثم إعادة تشغيل «نشر التطبيق» على main. (د) تجربة إشعار فعلي: حسابي ← فعّل إشعارات الهاتف ← «أرسل إشعاراً تجريبياً». (هـ) TestFlight بعد حساب Apple. (و) لاحقاً: ربط 8098 على 127.0.0.1 فقط بعد HTTPS (حتى لا يُزوَّر X-Forwarded-For عبر المنفذ المباشر) — ينتظر انتقال الآيفون كلياً إلى https.
+
+## حالة 2026-11-25 03:30 (نهاية محادثة الجلسة 8)
+- ✅ PR #9 وPR #10 مدموجان. PR #10 وضع ملف التشغيل داخل صورة saha-api: `/repo/infra/docker-compose.stack.yml` (CI يتحقق أنه مطابق للمستودع).
+- ✅ المالك ضغط Update في Docker Manager ← الحاويات الأربع حُدّثت (زر الإشعار التجريبي صار على الخادم). **saha-backup وsaha-edge لم تُضافا بعد** — Update لا يضيف خدمات جديدة.
+- ⚠️ المالك **لا يستطيع اللصق في محرر Docker Manager من الآيفون**، ووكيل هوستنجر يرفض أوامر الكتابة المباشرة (cp/mv/`>`) ونص Compose الطويل يُقتطع عند لصقه له. الحل الحالي: نص الوكيل أدناه (أوامر Docker فقط؛ حاوية مؤقتة تنسخ الملف). **بانتظار ردّ الوكيل.**
+- ❌ (03:31) **الوكيل رفض الخطوة 2، ثم رفض حتى `docker pull`**: الوكيل الآن للقراءة والفحص فقط — لا تعطه أي أمر تنفيذ. لم يتغير شيء على السيرفر.
+- **الخطة التالية (أول مهمة في الجلسة القادمة):** مشروع **منفصل جديد** في Docker Manager باسم `saha-ops` فيه خدمتا `backup` و`edge` فقط (شبكة `saha_net` الخارجية، `env_file: /docker/saha-stack/.env` بمسار مطلق، مجلد النسخ `/docker/saha-stack/backups`)، يُنشأ بزر **Compose from URL** برابط عام قصير — لا لصق ولا وكيل ولا تعديل على `saha-stack`. الرابط العام: يقدّمه saha-web (مثلاً `http://72.61.18.234:8098/ops/saha-ops.yml`) أو مصدر عام آخر؛ يحتاج PR ← دمج (بضغطة من المالك إن رُفض الدمج من الجلسة) ← Update لـ saha-stack ← Compose from URL. بعدها يُحذف `backup` و`edge` من `infra/docker-compose.stack.yml` أو يبقيان موثّقين كبديل، حتى لا تتكرر الحاويات بالاسم نفسه. تأكد أن Compose from URL يقبل http أو احتج لـ https.
+- بعد نجاح HTTPS: متغير المستودع `SAHA_WEB_URL` = `https://saha.72-61-18-234.sslip.io` ← إعادة تشغيل «نشر التطبيق» على main ← تجربة «أرسل إشعاراً تجريبياً» على الآيفون ← TestFlight.
+
+### نص وكيل هوستنجر لإضافة saha-backup وsaha-edge
+```text
+أريد تحديث مشروع saha-stack في /docker/saha-stack فقط، بأوامر Docker وحدها، دون لمس أي حاوية أو مشروع آخر، خصوصاً «خصوصي» و«مشاوي» وsaha-preview، ودون لمس ملف .env.
+
+1) اسحب الصورة:
+docker pull ghcr.io/abtkare/saha-api:latest
+
+2) حاوية مؤقتة تأخذ نسخة احتياطية من ملف التشغيل الحالي ثم تضع الملف الجديد الكامل من داخل الصورة (لا كتابة من الطرفية مباشرة):
+docker run --rm -v /docker/saha-stack:/target --entrypoint sh ghcr.io/abtkare/saha-api:latest -c "cp /target/docker-compose.yml /target/docker-compose.yml.bak-s7 && grep -q SAHA_EDGE_REMOVE /repo/infra/docker-compose.stack.yml && cp /repo/infra/docker-compose.stack.yml /target/docker-compose.yml && echo DONE"
+إن لم يطبع DONE فتوقف وأخبرني.
+
+3) تحقق دون تشغيل:
+docker compose -f /docker/saha-stack/docker-compose.yml config --services
+يجب أن تظهر 6 خدمات: db redis api web backup edge. إن لم تظهر فتوقف وأخبرني.
+
+4) شغّل:
+docker compose -f /docker/saha-stack/docker-compose.yml up -d
+ملاحظة: حاوية saha-edge هي التي تضيف ملف موقع واحداً لساحة في Nginx وتصدر الشهادة، وتتراجع تلقائياً إن تأثر أي موقع آخر. لا تعدّل Nginx بنفسك.
+
+5) انتظر دقيقتين ثم أعطني:
+- ناتج docker ps لحاويات saha-* فقط
+- ناتج: docker logs saha-edge --tail 40
+- ناتج: docker logs saha-backup --tail 10
+- ناتج: curl -s https://saha.72-61-18-234.sslip.io/api/v1/health
+```
 
 ## تشغيل HTTPS والنسخ الاحتياطي من Docker Manager (بعد دمج PR #9 وانتهاء البناء)
 1. افتح الملف على GitHub: https://github.com/abtkare/saha/blob/main/infra/docker-compose.stack.yml ← زر النسخ (Copy raw file).
