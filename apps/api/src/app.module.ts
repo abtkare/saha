@@ -19,6 +19,7 @@ import { PushController, PushService } from './notifications/push';
 import { MediaController, UploadsController, UploadsService } from './uploads/uploads';
 import { HeroController, SlidesAdminController, SlidesService } from './content/slides';
 import { SponsorLeadsPublicController, SponsorsController, SponsorsService } from './content/sponsors';
+import { SponsorRequestsController, SponsorRequestsService } from './content/sponsor-requests';
 import { PostsAdminController, PostsPublicController, PostsService } from './content/posts';
 
 @Module({
@@ -29,12 +30,12 @@ import { PostsAdminController, PostsPublicController, PostsService } from './con
     MatchesController, MatchManageController, ResultsController,
     NotificationsController, PushController, UploadsController, MediaController,
     TeamsPublicController, TeamsController,
-    HeroController, SlidesAdminController, SponsorLeadsPublicController, SponsorsController, PostsPublicController, PostsAdminController,
+    HeroController, SlidesAdminController, SponsorLeadsPublicController, SponsorsController, SponsorRequestsController, PostsPublicController, PostsAdminController,
   ],
   providers: [
     TournamentsService, TournamentManageService, MatchesService, MatchManageService, TeamsService,
     ResultsService, ResultSweeper, NotificationsService, PushService, UploadsService,
-    SlidesService, SponsorsService, PostsService,
+    SlidesService, SponsorsService, SponsorRequestsService, PostsService,
   ],
 })
 export class AppModule {}

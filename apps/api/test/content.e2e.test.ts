@@ -212,16 +212,19 @@ describe('الجلسة 5 — شريحة مدفوعة لا تُنشر دون اع
     expect(hero.body.refreshSeconds).toBe(30);
   });
 
-  it('من أنشأ الشريحة المدفوعة أو عدّلها لا يعتمدها، حتى المدير العام', async () => {
-    const s = await api('POST', '/admin/slides', { type: 'sponsor', titleAr: 'عرض دجلة', sponsorId: sponsorB }, admin.token);
+  it('من أنشأ الشريحة المدفوعة أو عدّلها لا يعتمدها — إلا المدير العام ويُسجَّل ذلك', async () => {
+    const s = await api('POST', '/admin/slides', { type: 'sponsor', titleAr: 'عرض دجلة', sponsorId: sponsorB }, editor.token);
     otherSponsorSlide = s.body.id;
     createdSlides.push(otherSponsorSlide);
-    await api('POST', `/admin/slides/${otherSponsorSlide}/submit`, undefined, admin.token);
-    expect((await api('POST', `/admin/slides/${otherSponsorSlide}/approve`, undefined, admin.token)).body.code).toBe('SELF_APPROVAL');
-    // المحرر عدّلها وهي قيد المراجعة ← هو أيضاً لا يعتمدها
-    expect((await api('PATCH', `/admin/slides/${otherSponsorSlide}`, { subtitleAr: 'وجبة مجانية للفائز' }, editor.token)).status).toBe(200);
+    await api('POST', `/admin/slides/${otherSponsorSlide}/submit`, undefined, editor.token);
     expect((await api('POST', `/admin/slides/${otherSponsorSlide}/approve`, undefined, editor.token)).body.code).toBe('SELF_APPROVAL');
-    expect((await api('POST', `/admin/slides/${otherSponsorSlide}/approve`, undefined, editor2.token)).body.status).toBe('published');
+    // المدير العام عدّلها وهي قيد المراجعة ← يعتمدها بنفسه، ويُسجَّل selfApproved
+    expect((await api('PATCH', `/admin/slides/${otherSponsorSlide}`, { subtitleAr: 'وجبة مجانية للفائز' }, admin.token)).status).toBe(200);
+    expect((await api('POST', `/admin/slides/${otherSponsorSlide}/approve`, undefined, editor.token)).body.code).toBe('SELF_APPROVAL');
+    const ok = await api('POST', `/admin/slides/${otherSponsorSlide}/approve`, undefined, admin.token);
+    expect(ok.body.status, JSON.stringify(ok.body)).toBe('published');
+    const audit = await db.query(`SELECT payload FROM audit_log WHERE entity='hero_slide' AND entity_id=$1 AND action='slide.approve' ORDER BY seq DESC LIMIT 1`, [String(otherSponsorSlide)]);
+    expect(audit.rows[0].payload.selfApproved).toBe(true);
   });
 
   it('تعديل محتوى شريحة منشورة يسحب اعتمادها فتختفي، وتغيير الأولوية لا يسحبه', async () => {
@@ -457,6 +460,111 @@ describe('الجلسة 5 — الأخبار والصفحات', () => {
     expect((await api('POST', `/admin/posts/${newsId}/archive`, undefined, editor.token)).body.status).toBe('archived');
     expect((await api('GET', `/news/${newsSlug}`)).status).toBe(404);
     expect((await api('PATCH', `/admin/posts/${newsId}`, { titleAr: 'تعديل' }, editor.token)).body.code).toBe('POST_ARCHIVED');
+  });
+});
+
+describe('الجلسة 11 — طلب رعاية حدث', () => {
+  let reqId = 0;
+  let requester: U;
+  let img = 0;
+
+  it('صاحب الطلب يرى الأحداث المتاحة ويقدّم طلباً بصورة خاصة، ويُشعَر مدير الرعاة', async () => {
+    requester = await login('صاحب مطعم الجلسة 11', 1988);
+    const ev = await api('GET', '/sponsor-requests/events', undefined, requester.token);
+    expect(ev.status, JSON.stringify(ev.body)).toBe(200);
+    expect(ev.body.some((t: any) => t.id === tournamentId)).toBe(true);
+    const up = await upload(PNG(), requester.token);
+    expect(up.body.isPublic).toBe(false);
+    img = up.body.id;
+    const base = { orgName: `مطعم السلطان ${run}`, titleAr: 'السلطان يرعى المباراة', subtitleAr: 'خصم 20% لجمهور ساحة', imageMediaId: img, days: 14, matchId };
+    expect((await api('POST', '/sponsor-requests', { ...base, days: 5 }, requester.token)).status).toBe(400);
+    expect((await api('POST', '/sponsor-requests', { ...base, matchId: undefined }, requester.token)).body.code).toBe('EVENT_REQUIRED');
+    const other = await upload(PNG(), outsider.token);
+    expect((await api('POST', '/sponsor-requests', { ...base, imageMediaId: other.body.id }, requester.token)).body.code).toBe('MEDIA_INVALID');
+    const r = await api('POST', '/sponsor-requests', base, requester.token);
+    expect(r.status, JSON.stringify(r.body)).toBe(201);
+    expect(r.body.status).toBe('pending');
+    expect(r.body.tournament.id).toBe(tournamentId);
+    reqId = r.body.id;
+    // الصورة خاصة: لا تُعرض للعامة، وتُعرض لصاحبها ولمدير الرعاة فقط
+    expect((await fetch(`${BASE}/media/${img}`)).status).toBe(404);
+    const own = await fetch(`${BASE}/sponsor-requests/${reqId}/image`, { headers: { authorization: `Bearer ${requester.token}` } });
+    expect(own.status).toBe(200);
+    expect((await fetch(`${BASE}/sponsor-requests/${reqId}/image`, { headers: { authorization: `Bearer ${outsider.token}` } })).status).toBe(404);
+    expect((await fetch(`${BASE}/sponsor-requests/${reqId}/image`, { headers: { authorization: `Bearer ${sponsorMgr.token}` } })).status).toBe(200);
+    const n = await db.query(`SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND data->>'sponsorRequestId' = $2`, [sponsorMgr.id, String(reqId)]);
+    expect(n.rows[0].n).toBe(1);
+    const mine = await api('GET', '/me/sponsor-requests', undefined, requester.token);
+    expect(mine.body[0].id).toBe(reqId);
+  });
+
+  it('غير مدير الرعاة لا يرى الطلبات ولا يقبلها', async () => {
+    expect((await api('GET', '/admin/sponsor-requests', undefined, editor.token)).status).toBe(403);
+    expect((await api('POST', `/admin/sponsor-requests/${reqId}/accept`, {}, requester.token)).status).toBe(403);
+    const list = await api('GET', '/admin/sponsor-requests?status=pending', undefined, sponsorMgr.token);
+    const row = list.body.find((x: any) => x.id === reqId);
+    expect(row.user.id).toBe(requester.id);
+  });
+
+  it('القبول من المدير العام: راعٍ جديد + شريحة منشورة كاتبها صاحب الطلب + بوابة الراعي + إشعار', async () => {
+    const a = await api('POST', `/admin/sponsor-requests/${reqId}/accept`, { priority: 95 }, admin.token);
+    expect(a.status, JSON.stringify(a.body)).toBe(200);
+    expect(a.body.slide.status).toBe('published');
+    createdSlides.push(a.body.slide.id);
+    const days = (Date.parse(a.body.slide.endsAt) - Date.parse(a.body.slide.startsAt)) / 86400_000;
+    expect(days).toBe(14);
+    const hero = await api('GET', '/home/hero');
+    const s = hero.body.slides.find((x: any) => x.id === a.body.slide.id);
+    expect(s, JSON.stringify(hero.body.slides.map((x: any) => x.id))).toBeTruthy();
+    expect(s.sponsored).toBe(true);
+    expect(s.sponsor.nameAr).toBe(`مطعم السلطان ${run}`);
+    expect(s.imageUrl).toBe(`/api/v1/media/${img}`);
+    expect(s.linkUrl).toBe(`/matches/${matchId}`);
+    expect((await fetch(`${BASE}${s.imageUrl.replace('/api/v1', '')}`)).status).toBe(200);
+    const row = await db.query(`SELECT created_by_id, approved_by_id FROM hero_slides WHERE id = $1`, [a.body.slide.id]);
+    expect(row.rows[0]).toEqual({ created_by_id: requester.id, approved_by_id: admin.id });
+    // صاحب الطلب صار يرى تقرير راعيه فقط
+    const rep = await api('GET', '/sponsor/report', undefined, requester.token);
+    expect(rep.status, JSON.stringify(rep.body)).toBe(200);
+    expect(rep.body.sponsor.id).toBe(a.body.sponsorId);
+    expect((await api('GET', `/sponsor/report?sponsorId=${sponsorA}`, undefined, requester.token)).status).toBe(403);
+    const n = await db.query(`SELECT title_ar FROM notifications WHERE user_id = $1 AND data->>'sponsorRequestId' = $2`, [requester.id, String(reqId)]);
+    expect(n.rows[0].title_ar).toContain('قُبل');
+    expect((await api('POST', `/admin/sponsor-requests/${reqId}/accept`, {}, admin.token)).body.code).toBe('NOT_PENDING');
+    expect((await api('POST', `/me/sponsor-requests/${reqId}/cancel`, undefined, requester.token)).body.code).toBe('NOT_PENDING');
+  });
+
+  it('مدير الرعاة يقبل لراعٍ موجود فتنتظر الشريحة الاعتماد، ويرفض بسبب، وصاحب الطلب يلغي', async () => {
+    const mk = async () => {
+      const up = await upload(PNG(), requester.token);
+      return (await api('POST', '/sponsor-requests', { orgName: 'الرافدين', titleAr: 'الرافدين ترعى البطولة', imageMediaId: up.body.id, days: 7, tournamentId }, requester.token)).body.id as number;
+    };
+    const r1 = await mk();
+    const a = await api('POST', `/admin/sponsor-requests/${r1}/accept`, { sponsorId: sponsorA }, sponsorMgr.token);
+    expect(a.status, JSON.stringify(a.body)).toBe(200);
+    expect(a.body.sponsorId).toBe(sponsorA);
+    expect(a.body.slide.status).toBe('review');
+    createdSlides.push(a.body.slide.id);
+    expect(await heroIds()).not.toContain(a.body.slide.id);
+    // الكاتب صاحب الطلب، فيعتمدها محرر المحتوى
+    expect((await api('POST', `/admin/slides/${a.body.slide.id}/approve`, undefined, editor.token)).body.status).toBe('published');
+
+    const r2 = await mk();
+    expect((await api('POST', `/admin/sponsor-requests/${r2}/reject`, { note: 'ن' }, sponsorMgr.token)).status).toBe(400);
+    const rj = await api('POST', `/admin/sponsor-requests/${r2}/reject`, { note: 'الصورة غير واضحة' }, sponsorMgr.token);
+    expect(rj.body.status).toBe('rejected');
+    expect(rj.body.reviewNote).toBe('الصورة غير واضحة');
+
+    const r3 = await mk();
+    expect((await api('POST', `/me/sponsor-requests/${r3}/cancel`, undefined, outsider.token)).status).toBe(404);
+    expect((await api('POST', `/me/sponsor-requests/${r3}/cancel`, undefined, requester.token)).body.status).toBe('cancelled');
+    const audit = await db.query(`SELECT DISTINCT action FROM audit_log WHERE entity = 'sponsor_request'`);
+    for (const x of ['sponsor_request.create', 'sponsor_request.accept', 'sponsor_request.reject', 'sponsor_request.cancel']) expect(audit.rows.map((y) => y.action)).toContain(x);
+  });
+
+  it('القاعدة ترفض مدة غير مسموحة وطلباً مقبولاً بلا راعٍ', async () => {
+    await expect(db.query(`UPDATE sponsor_requests SET days = 5 WHERE id = $1`, [reqId])).rejects.toThrow(/sponsor_requests_days_chk/);
+    await expect(db.query(`UPDATE sponsor_requests SET sponsor_id = NULL WHERE id = $1`, [reqId])).rejects.toThrow(/sponsor_requests_accepted_chk/);
   });
 });
 

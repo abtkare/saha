@@ -252,6 +252,20 @@ export const SPONSOR_LEAD_STATUS_LABELS: Record<SponsorLeadStatus, string> = {
   closed: 'مغلق',
 };
 
+/** طلب رعاية حدث (الجلسة 11): الراعي يطلب ظهور شريحته خلال بطولة أو مباراة، ومدير الرعاة يقبل أو يرفض */
+export const SPONSOR_REQUEST_STATUSES = ['pending', 'accepted', 'rejected', 'cancelled'] as const;
+export type SponsorRequestStatus = (typeof SPONSOR_REQUEST_STATUSES)[number];
+export const SPONSOR_REQUEST_STATUS_LABELS: Record<SponsorRequestStatus, string> = {
+  pending: 'قيد المراجعة',
+  accepted: 'مقبول',
+  rejected: 'مرفوض',
+  cancelled: 'ملغى',
+};
+/** مدة العرض المتاحة بالأيام، تبدأ من لحظة القبول */
+export const SPONSOR_REQUEST_DAYS = [7, 14, 30] as const;
+/** أقصى عدد طلبات قيد المراجعة للمستخدم الواحد */
+export const SPONSOR_REQUEST_MAX_PENDING = 3;
+
 /** نسبة النقر إلى الظهور بنسبة مئوية بمنزلتين (0 إن لم يكن ظهور) */
 export function ctr(impressions: number, clicks: number): number {
   return impressions > 0 ? Math.round((clicks / impressions) * 10000) / 100 : 0;

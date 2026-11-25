@@ -105,6 +105,14 @@ export async function download(path: string, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
+/** صورة محمية (مثل صورة طلب الرعاية) كرابط blob: للعرض في <img> */
+export async function protectedImage(path: string): Promise<string> {
+  let res = await raw(path, {});
+  if (res.status === 401 && (await refresh())) res = await raw(path, {});
+  if (!res.ok) throw new ApiError(res.status, 'IMAGE', 'تعذّر تحميل الصورة.');
+  return URL.createObjectURL(await res.blob());
+}
+
 export async function uploadImage(file: File, purpose: 'content' | 'private') {
   const form = new FormData();
   form.append('purpose', purpose);

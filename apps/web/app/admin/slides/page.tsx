@@ -25,6 +25,8 @@ export default function Slides() {
   const [edit, setEdit] = useState<Slide | 'new' | null>(null);
   const [type, setType] = useState<SlideType>('promo');
   const canPublish = s.can('content.publish');
+  // المدير العام يعتمد شريحة الراعي التي كتبها بنفسه
+  const superAdmin = !!s.me?.mfa && !!s.me?.roles?.some((r) => r.role === 'super_admin');
   const onlySponsor = !s.can('content.draft') && s.can('slides.sponsor');
   const types = onlySponsor ? (['sponsor'] as SlideType[]) : [...SLIDE_TYPES];
 
@@ -123,7 +125,7 @@ export default function Slides() {
                 <div className="row">
                   {canEdit && <button type="button" className="btn btn-sm" onClick={() => setEdit(x)}>تعديل</button>}
                   {x.status === 'draft' && canEdit && <button type="button" className="btn btn-sm btn-primary" disabled={act.busy} onClick={() => void go(`/admin/slides/${x.id}/submit`, 'أُرسلت للمراجعة.')}>أرسل للمراجعة</button>}
-                  {x.status === 'review' && canPublish && (paid && mine
+                  {x.status === 'review' && canPublish && (paid && mine && !superAdmin
                     ? <span className="muted">يعتمدها شخص آخر غير كاتبها.</span>
                     : <>
                         <button type="button" className="btn btn-sm btn-primary" disabled={act.busy} onClick={() => void go(`/admin/slides/${x.id}/approve`, 'اعتُمدت ونُشرت.')}>اعتماد ونشر</button>

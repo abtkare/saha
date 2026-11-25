@@ -23,6 +23,8 @@ export type Route =
   | { name: 'createTeam' }
   | { name: 'joinTeam' }
   | { name: 'search' }
+  | { name: 'sponsorRequest'; tournamentId?: number; matchId?: number }
+  | { name: 'sponsorRequests' }
   | { name: 'page'; slug: 'terms' | 'privacy' | 'contact' };
 
 interface Entry { key: number; route: Route; closing?: boolean }
@@ -64,6 +66,7 @@ export function routeFromPath(path: string): { tab?: TabName; route?: Route } | 
     case 'manage': return Number.isInteger(id) && id > 0 ? { tab: 'myteams', route: { name: 'teamManage', id } } : null;
     case 'family': return { tab: 'account', route: { name: 'family' } };
     case 'search': return { route: { name: 'search' } };
+    case 'sponsor-requests': return { tab: 'account', route: { name: 'sponsorRequests' } };
     case 'terms': case 'privacy': case 'contact': return { route: { name: 'page', slug: a } };
     default: return null;
   }

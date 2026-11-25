@@ -16,6 +16,7 @@ export const NAV: NavItem[] = [
   { href: '/admin/slides', label: 'الهيرو سلايدر', show: any('content.draft', 'content.publish', 'slides.sponsor') },
   { href: '/admin/posts', label: 'الأخبار والصفحات', show: any('content.draft', 'content.publish') },
   { href: '/admin/sponsors', label: 'الرعاة', show: any('sponsors.manage') },
+  { href: '/admin/sponsor-requests', label: 'طلبات الرعاية', show: any('sponsors.manage') },
   { href: '/admin/users', label: 'المستخدمون والأدوار', show: any('users.manage') },
   { href: '/admin/audit', label: 'سجل التدقيق', show: any('audit.verify') },
   { href: '/admin/account', label: 'حسابي', show: () => true },

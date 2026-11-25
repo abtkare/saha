@@ -97,6 +97,14 @@ export function AccountScreen() {
               </Card>
             </Section>
 
+            <Section title="الرعاية">
+              <Card flush>
+                <ListRow title="اطلب رعاية بطولة أو مباراة" subtitle="شريحتك في الشاشة الرئيسية لجمهور ساحة" icon="trophy" onPress={() => push({ name: 'sponsorRequest' })} />
+                <Divider />
+                <ListRow title="طلبات الرعاية" subtitle="الحالة، ومدة العرض، وبوابة الراعي" icon="flag" onPress={() => push({ name: 'sponsorRequests' })} />
+              </Card>
+            </Section>
+
             <Section title="العائلة">
               <Card flush><ListRow title="الأبناء وموافقة ولي الأمر" subtitle="لاعبون دون 18 سنة، والموافقة على الصور" icon="child" onPress={() => push({ name: 'family' })} /></Card>
             </Section>

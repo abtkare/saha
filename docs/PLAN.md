@@ -439,6 +439,7 @@ saha/
 | الإشعارات | `GET /me/notifications?unread=` · `POST /me/notifications/:id/read` · `POST /me/notifications/read-all` · `POST /me/notifications/test` (إشعار تجريبي لي، 3 كل 10 دقائق) · `POST /me/push-tokens {token, platform}` · `DELETE /me/push-tokens {token}` |
 | المحتوى (عام) | `GET /home/hero` (الشرائح الحيّة + `refreshSeconds: 30`) · `POST /hero/:id/events {type: impression\|click, deviceId}` · `GET /news?limit=` · `GET /news/:slug` · `GET /pages/:slug` · `POST /sponsor-leads` («كن راعياً») · `GET /media/:id` (صور المحتوى العامة) |
 | النتيجة النصية | `PATCH /matches/:id/live {text}` (حكم المباراة أو إدارة البطولة، يوم المباراة وقبل إدخال النتيجة) |
+| طلب رعاية حدث | `GET /sponsor-requests/events` · `POST /sponsor-requests` · `GET /me/sponsor-requests` · `POST /me/sponsor-requests/:id/cancel` · `GET /sponsor-requests/:id/image` (لصاحبه ومدير الرعاة) · `GET /admin/sponsor-requests?status=` · `POST /admin/sponsor-requests/:id/accept {sponsorId?, priority?}` · `POST /admin/sponsor-requests/:id/reject {note}` |
 | بوابة الراعي | `GET /sponsor/me` · `GET /sponsor/report?sponsorId=&from=&to=` · `GET /sponsor/report.csv` |
 | إدارة المحتوى | `GET/POST /admin/slides` · `GET/PATCH /admin/slides/:id` · `POST /admin/slides/:id/submit\|approve\|reject\|archive` · `GET/POST /admin/posts` · `GET/PATCH /admin/posts/:id` · `POST /admin/posts/:id/submit\|publish\|reject\|archive` · `GET/POST /admin/sponsors` · `PATCH /admin/sponsors/:id` · `GET /admin/sponsor-leads?status=` · `PATCH /admin/sponsor-leads/:id` |
 | الملفات | `POST /uploads` (multipart بحقل `file`: JPEG/PNG/WebP حتى 5MB، 30 صورة/ساعة؛ الحقل `purpose=content` لصور المحتوى العامة؛ التحويل إلى WebP لاحقاً) |
@@ -586,3 +587,13 @@ https://claude.ai/artifact/4yE5e1UHMKrKCDTAk2YCpD
 - CI يشغّل خدمة backup من الملف نفسه وبنفس مسارات السيرفر ثم يسترجع النسخة ويتحقق، ويتأكد أن الموقع يقدّم الملف حرفياً.
 - **(04:04) HTTPS يعمل:** `https://saha.72-61-18-234.sslip.io` عبر saha-ops، والتطبيق المنشور (EAS) صار يكلّم الخادم عبر https افتراضياً. Compose from URL في Docker Manager يقبل روابط http.
 - (2026-11-25) **TestFlight:** حساب Apple شركة (Team `2PB3RY6HRM`)، التطبيق «ساحة البطولات» `app.saha.iq` (Apple ID `6838996508`)، مفتاح ASC API بصلاحية Admin. القيم غير السرية في `app-store.yml` مباشرة، والسر الوحيد `ASC_KEY_P8`. التشغيل: Run workflow أو الرفع على الفرع `testflight`. البناء على EAS؛ شهادة التوزيع وملف التعريف ينشئهما CI عبر App Store Connect API (`asc-signing.mjs`) لأن EAS لا ينشئها دون تفاعل، وEAS يثبّت حزم التطبيق بـ npm. أول نسخة (بناء 8) رُفعت 2026-11-25.
+
+### 2026-11-25 — الجلسة 11 (ملاحظات نسخة TestFlight)
+- **سبب عدم ظهور شرائح الرعاة:** قاعدة «الشريحة المدفوعة لا يعتمدها كاتبها أو آخر من عدّلها» منعت المالك (المدير الوحيد) من اعتماد شرائحه فبقيت «قيد المراجعة». **القرار:** المدير العام (بدخول TOTP) وحده يعتمد شريحة راعٍ كتبها بنفسه، ويُسجَّل `selfApproved: true` في سجل التدقيق. بقية الأدوار كما هي.
+- **تدفق الراعي الكامل — طلب رعاية حدث** (migration `0008_sponsor_requests`، جدول `sponsor_requests`):
+  1. مستخدم مسجّل بالغ (برقم هاتفه) من التطبيق (حسابي ← «اطلب رعاية بطولة أو مباراة»، أو زر «ارعَ هذه البطولة» في صفحة البطولة) أو من الموقع `/sponsor/request`: يختار بطولة (تسجيل مفتوح أو جارية) أو مباراة قادمة منها، واسم الجهة، والعنوان، ونصاً قصيراً، وصورة (خاصة حتى القبول)، ورابطاً اختيارياً، ومدة 7/14/30 يوماً.
+  2. الطلب «قيد المراجعة» (حد 3 طلبات معلّقة للمستخدم) ← إشعار للمدير العام ومديري الرعاة.
+  3. اللوحة ← «طلبات الرعاية»: **قبول** (راعٍ جديد باسم الجهة وبيانات صاحب الطلب، أو ربطه براعٍ موجود) أو **رفض بسبب** يصل لصاحب الطلب. أو يلغيه صاحبه قبل الرد.
+  4. القبول في معاملة واحدة: الصورة تصير عامة ← شريحة «راعٍ» **كاتبها صاحب الطلب** (فاعتماد القابل اعتماد من شخص آخر) تبدأ الآن وتنتهي بعد المدة، رابطها الافتراضي صفحة المباراة/البطولة، الأولوية 10 ← تُنشر فوراً إن كان القابل يملك `content.publish`، وإلا «قيد المراجعة» ← يُمنح صاحب الطلب دور «راعٍ» مقيّداً بهذا الراعي (بوابة الراعي برقم هاتفه) ← إشعار.
+- إضافة راعٍ من صفحة «الرعاة» تبقى لبيانات الراعي فقط؛ ظهوره في التطبيق يكون بشريحة (يدوياً من «الهيرو سلايدر» أو بقبول طلب).
+
