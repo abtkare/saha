@@ -1,17 +1,18 @@
 name: نسخة TestFlight (iOS)
 
-# يدوي فقط: GitHub ← Actions ← «نسخة TestFlight (iOS)» ← Run workflow.
 # يبني التطبيق على خوادم Expo (EAS Build) ويرفعه إلى App Store Connect فيظهر في TestFlight.
-# يحتاج حساب Apple Developer، وتطبيقاً منشأً في App Store Connect بالمعرّف app.saha.iq، وهذه الأسرار في
-# Settings ← Secrets and variables ← Actions:
-#   EXPO_TOKEN       (موجود)
-#   ASC_KEY_P8       محتوى ملف مفتاح App Store Connect API (.p8) كاملاً
-#   ASC_KEY_ID       معرّف المفتاح (Key ID)
-#   ASC_ISSUER_ID    Issuer ID
-#   APPLE_TEAM_ID    Team ID من developer.apple.com ← Membership
-#   ASC_APP_ID       Apple ID للتطبيق (رقم) من App Store Connect ← التطبيق ← App Information
+# التشغيل: GitHub ← Actions ← «نسخة TestFlight (iOS)» ← Run workflow، أو رفع على الفرع testflight.
+# القيم غير السرية مكتوبة هنا مباشرة (ليست أسراراً):
+#   الفريق: شركة عصر الريادة — Team ID 2PB3RY6HRM (حساب شركة)
+#   التطبيق: «ساحة البطولات» app.saha.iq — Apple ID 6838996508
+#   مفتاح App Store Connect API «EAS» (Admin) — Key ID 4X6NC7B978
+# الأسرار الوحيدة في Settings ← Secrets and variables ← Actions:
+#   EXPO_TOKEN   (موجود)
+#   ASC_KEY_P8   محتوى ملف المفتاح AuthKey_4X6NC7B978.p8 كاملاً
 on:
   workflow_dispatch:
+  push:
+    branches: [testflight]
 
 jobs:
   ios:
@@ -26,11 +27,11 @@ jobs:
       EXPO_NO_TELEMETRY: "1"
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
-      EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      EXPO_APPLE_TEAM_TYPE: INDIVIDUAL
-      ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+      EXPO_ASC_KEY_ID: 4X6NC7B978
+      EXPO_ASC_ISSUER_ID: 61482282-93b4-43db-9e12-2a752b3b4448
+      EXPO_APPLE_TEAM_ID: 2PB3RY6HRM
+      EXPO_APPLE_TEAM_TYPE: COMPANY_OR_ORGANIZATION
+      ASC_APP_ID: "6838996508"
       EXPO_ASC_API_KEY_PATH: /tmp/asc.p8
       SAHA_EAS: "1"
       SAHA_STORE: "1"
@@ -42,9 +43,10 @@ jobs:
       - name: التحقق من الأسرار
         run: |
           miss=""
-          for v in EXPO_TOKEN ASC_KEY_P8 EXPO_ASC_KEY_ID EXPO_ASC_ISSUER_ID EXPO_APPLE_TEAM_ID ASC_APP_ID; do [ -n "${!v}" ] || miss="$miss $v"; done
+          for v in EXPO_TOKEN ASC_KEY_P8; do [ -n "${!v}" ] || miss="$miss $v"; done
           [ -z "$miss" ] || { echo "::error title=أسرار ناقصة::$miss"; exit 1; }
-          printf '%s\n' "$ASC_KEY_P8" > "$EXPO_ASC_API_KEY_PATH"
+          printf '%s\n' "$ASC_KEY_P8" | tr -d '\r' > "$EXPO_ASC_API_KEY_PATH"
+          grep -q "BEGIN PRIVATE KEY" "$EXPO_ASC_API_KEY_PATH" && grep -q "END PRIVATE KEY" "$EXPO_ASC_API_KEY_PATH" || { echo "::error title=ASC_KEY_P8::النص لا يبدأ بـ BEGIN PRIVATE KEY أو لا ينتهي بـ END PRIVATE KEY"; exit 1; }
           node -e "const f='eas.json',j=JSON.parse(require('fs').readFileSync(f));j.submit.production.ios={ascAppId:process.env.ASC_APP_ID,appleTeamId:process.env.EXPO_APPLE_TEAM_ID,ascApiKeyPath:process.env.EXPO_ASC_API_KEY_PATH,ascApiKeyId:process.env.EXPO_ASC_KEY_ID,ascApiKeyIssuerId:process.env.EXPO_ASC_ISSUER_ID};require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
       - name: تثبيت الحزم وأداة EAS
         run: |
