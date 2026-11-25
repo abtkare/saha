@@ -29,7 +29,7 @@ jobs:
       EXPO_NO_TELEMETRY: "1"
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       SAHA_EAS: "1"
-      SAHA_WEB_URL: ${{ vars.SAHA_WEB_URL || 'http://72.61.18.234:8098' }}
+      SAHA_WEB_URL: ${{ vars.SAHA_WEB_URL || 'https://saha.72-61-18-234.sslip.io' }}
       CHANNEL: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
       PROJECT_ID: e971c618-1a3d-49f3-8c3d-ddf5bd31ce29
     steps:

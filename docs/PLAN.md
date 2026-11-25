@@ -584,3 +584,4 @@ https://claude.ai/artifact/4yE5e1UHMKrKCDTAk2YCpD
 - **أُزيلت** خدمتا `backup` و`edge` من `infra/docker-compose.stack.yml` (أربع خدمات فقط) حتى لا تتكرر أسماء الحاويات.
 - **الطوارئ:** `http://72.61.18.234:8098/ops/saha-ops-remove.yml` نسخة مطابقة فيها `SAHA_EDGE_REMOVE: "1"` (حذف مشروع saha-ops ثم إنشاؤه من هذا الرابط ← يحذف ملف ساحة وحده من Nginx).
 - CI يشغّل خدمة backup من الملف نفسه وبنفس مسارات السيرفر ثم يسترجع النسخة ويتحقق، ويتأكد أن الموقع يقدّم الملف حرفياً.
+- **(04:04) HTTPS يعمل:** `https://saha.72-61-18-234.sslip.io` عبر saha-ops، والتطبيق المنشور (EAS) صار يكلّم الخادم عبر https افتراضياً. Compose from URL في Docker Manager يقبل روابط http.
