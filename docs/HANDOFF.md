@@ -1,6 +1,6 @@
 # ملف تسليم الجلسة — مشروع «ساحة»
 
-آخر تحديث: 2026-11-25 05:50 (الجلسة 10 — TestFlight)
+آخر تحديث: 2026-11-25 06:20 (الجلسة 10 — TestFlight ✅)
 
 ## المشروع باختصار
 منصة «ساحة» (Saha) للبطولات الكروية: موقع + تطبيق + لوحة إدارة.
@@ -138,7 +138,12 @@
   - **باقٍ من المالك:** (1) رقم **Apple ID** للتطبيق من App Information. (2) مفتاح API: Users and Access ← Integrations ← App Store Connect API (Request Access إن ظهر) ← Team Keys ← + ← الاسم EAS، الصلاحية **Admin** ← Download ملف .p8 + نسخ **Issuer ID** و**Key ID**. (3) السر `ASC_KEY_P8` في GitHub (يغيّر امتداد الملف إلى .txt في «الملفات» ليفتحه وينسخ نصه) — الجلسة لا تملك صلاحية أسرار/متغيرات Actions.
   - **على الجلسة بعد استلام القيم:** في `.github/workflows/app-store.yml` اكتب القيم غير السرية مباشرة (Team ID `2PB3RY6HRM`، `EXPO_APPLE_TEAM_TYPE: COMPANY_OR_ORGANIZATION`، Key ID، Issuer ID، ASC App ID) واجعل السر الوحيد `ASC_KEY_P8` (+ EXPO_TOKEN الموجود)، ثم PR ← CI ← دمج ← تشغيل «نسخة TestFlight (iOS)» (workflow_dispatch — إن رُفض من الجلسة لأن مسارات Actions محجوبة بالبروكسي، فالمالك يضغط Run workflow من GitHub). غير مؤكد أن EAS ينشئ شهادات iOS دون تفاعل بمفتاح ASC — إن فشل فالبديل: تشغيل `eas credentials` تفاعلياً مرة واحدة (يحتاج حاسوباً) أو رفع شهادة/ملف تعريف يدوياً.
 - ✅ **(05:45) القيم جاهزة:** Apple ID للتطبيق `6838996508`، مفتاح API «EAS» بصلاحية Admin — Key ID `4X6NC7B978`، Issuer ID `61482282-93b4-43db-9e12-2a752b3b4448`. السر `ASC_KEY_P8` أُضيف في GitHub (رسالة «تمت إضافة سر المستودع»). ملف .p8 في تنزيلات آيفون المالك ولا يُفتح على الآيفون — لا حاجة له بعد الآن.
-- ⏳ **(الجلسة 10) `app-store.yml`:** القيم غير السرية مكتوبة فيه، والسرّان فقط `EXPO_TOKEN` و`ASC_KEY_P8`. أُضيف تشغيل تلقائي عند الرفع على الفرع **`testflight`** (لأن الجلسة لا تستطيع workflow_dispatch) — الرفع على هذا الفرع يبدأ البناء. النتيجة تُقرأ من `/commits/<sha>/check-runs`.
+- ✅ **(06:17) أول نسخة TestFlight رُفعت:** بناء EAS رقم **8** (buildNumber يُدار عن بُعد ويزيد تلقائياً) ← `eas submit` ← «Submitted your app to Apple App Store Connect». EAS أنشأ مجموعة اختبار داخلية «Team (Expo)». الفرع `testflight` (PR إلى main).
+  - **كيف يعمل `app-store.yml`:** القيم غير السرية مكتوبة فيه، والسرّان `EXPO_TOKEN` و`ASC_KEY_P8` فقط. يبدأ بـ Run workflow أو **بالرفع على الفرع `testflight`** (الجلسة لا تستطيع workflow_dispatch). النتيجة من `/commits/<sha>/check-runs` وسجل الوظيفة.
+  - **التوقيع:** EAS يرفض إنشاء شهادات iOS دون تفاعل («Distribution Certificate is not validated for non-interactive builds»). الحل `.github/scripts/asc-signing.mjs`: عبر App Store Connect API ينشئ في كل تشغيل شهادة Apple Distribution جديدة + ملف تعريف App Store باسم `saha-eas <الرقم التسلسلي>`، ويلغي فقط ما أنشأه التشغيل السابق بهذا الاسم (لا يلمس غيره؛ الإلغاء لا يؤثر على النسخ المرفوعة)، ويفعّل Push Notifications على المعرّف، ثم `credentialsSource: local`.
+  - **أداة التثبيت على EAS:** بلا ملف قفل في `apps/mobile` يختار EAS yarn ويفشل بسبب `packageManager: pnpm` في الجذر. الحل: CI يحذف `package-lock.json` من `apps/mobile/.gitignore` ويضيفه مع `eas.json` المعدّل في commit محلي على المشغّل (أرشيف EAS يحترم .gitignore).
+  - عند فشل البناء تطبع خطوة «سبب الفشل من سجل EAS» آخر 200 سطر من سجل EAS (`.github/scripts/eas-log.mjs`) — الجلسة لا تصل إلى expo.dev.
+  - **باقٍ:** (1) المالك يثبّت TestFlight ويقبل الدعوة (بريد alriyadagroup01@gmail.com) ويجرّب. (2) **إشعارات الهاتف في نسخة TestFlight لن تعمل** حتى يُرفع مفتاح APNs (.p8 من developer.apple.com ← Keys ← Apple Push Notifications service) إلى Expo (`eas credentials` أو صفحة Credentials في expo.dev) — في Expo Go تعمل كما هي. (3) مراجعة المتجر لاحقاً: لقطات، وصف، سياسة الخصوصية، تقييم العمر، ومتطلبات الصين يمكن تجاهلها باستبعاد الصين من التوزيع.
 - ملاحظة: الجلسة **لا تستطيع** قراءة/تشغيل مسارات GitHub Actions عبر البروكسي (`/actions/...` محجوب: المتغيرات والأسرار وworkflow_dispatch)، لكنها تقرأ نتائج check-runs وسجلات jobs عبر `/commits/<sha>/check-runs` و`/actions/jobs/<id>/logs`.
 - (قديم) المالك أكّد أن لديه حساب Apple Developer (2026-11-25). الخطة: سر واحد فقط في GitHub (`ASC_KEY_P8`)، والقيم غير السرية (Key ID، Issuer ID، Team ID، Apple ID للتطبيق، نوع الحساب) يرسلها المالك في المحادثة فتُكتب في `app-store.yml`.
 - ✅ **التطبيق صار على https:** القيمة الافتراضية لـ `SAHA_WEB_URL` في `app-update.yml` وبديل `src/config.ts` = `https://saha.72-61-18-234.sslip.io` (الجلسة لا تملك صلاحية متغيرات GitHub Actions، فغُيّرت القيمة في الملف).
