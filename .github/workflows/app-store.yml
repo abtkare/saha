@@ -35,6 +35,7 @@ jobs:
       EXPO_ASC_API_KEY_PATH: /tmp/asc.p8
       SAHA_EAS: "1"
       SAHA_STORE: "1"
+      EAS_BUILD_NO_EXPO_GO_WARNING: "true"
       SAHA_WEB_URL: https://saha.72-61-18-234.sslip.io
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +49,13 @@ jobs:
           printf '%s\n' "$ASC_KEY_P8" | tr -d '\r' > "$EXPO_ASC_API_KEY_PATH"
           grep -q "BEGIN PRIVATE KEY" "$EXPO_ASC_API_KEY_PATH" && grep -q "END PRIVATE KEY" "$EXPO_ASC_API_KEY_PATH" || { echo "::error title=ASC_KEY_P8::النص لا يبدأ بـ BEGIN PRIVATE KEY أو لا ينتهي بـ END PRIVATE KEY"; exit 1; }
           node -e "const f='eas.json',j=JSON.parse(require('fs').readFileSync(f));j.submit.production.ios={ascAppId:process.env.ASC_APP_ID,appleTeamId:process.env.EXPO_APPLE_TEAM_ID,ascApiKeyPath:process.env.EXPO_ASC_API_KEY_PATH,ascApiKeyId:process.env.EXPO_ASC_KEY_ID,ascApiKeyIssuerId:process.env.EXPO_ASC_ISSUER_ID};require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+      - name: شهادة التوزيع وملف التعريف (App Store Connect API)
+        env:
+          BUNDLE_ID: app.saha.iq
+          OUT_DIR: /tmp/ios-cred
+        run: |
+          node ../../.github/scripts/asc-signing.mjs
+          node -e "const f='eas.json',j=JSON.parse(require('fs').readFileSync(f));j.build.production.credentialsSource='local';require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
       - name: تثبيت الحزم وأداة EAS
         run: |
           npm install --no-audit --no-fund
