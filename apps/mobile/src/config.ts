@@ -11,7 +11,7 @@ export const extra = (Constants.expoConfig?.extra ?? {}) as Extra;
 function guessWeb(): string {
   if (extra.webUrl) return extra.webUrl.replace(/\/$/, '');
   const host = Constants.expoConfig?.hostUri?.split('/')[0];
-  return host ? `http://${host}` : 'http://72.61.18.234:8098';
+  return host ? `http://${host}` : 'https://saha.72-61-18-234.sslip.io';
 }
 
 export const WEB_URL = guessWeb();
