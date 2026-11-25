@@ -191,15 +191,16 @@ export class SponsorRequestsService {
     const now = new Date();
 
     const out = await this.prisma.$transaction(async (tx) => {
-      const claimed = await tx.sponsorRequest.updateMany({ where: { id, status: 'pending', updatedAt: req.updatedAt }, data: { status: 'accepted', handledById: auth.userId, handledAt: now, reviewNote: null } });
-      if (claimed.count !== 1) throw raced();
-
+      // الراعي أولاً: الطلب المقبول يجب أن يحمل راعياً (قيد sponsor_requests_accepted_chk)
       let sid = sponsorId;
       if (!sid) {
         const s = await tx.sponsor.create({ data: { nameAr: req.orgName, contactName: req.user.fullName, contactPhone: req.user.phone } });
         sid = s.id;
         await this.audit.record({ actorUserId: auth.userId, action: 'sponsor.create', entity: 'sponsor', entityId: s.id, payload: { nameAr: s.nameAr, fromRequest: id }, ip }, tx);
       }
+      const claimed = await tx.sponsorRequest.updateMany({ where: { id, status: 'pending', updatedAt: req.updatedAt }, data: { status: 'accepted', sponsorId: sid, handledById: auth.userId, handledAt: now, reviewNote: null } });
+      if (claimed.count !== 1) throw raced();
+
       let imageUrl: string | null = null;
       if (req.imageMediaId) {
         await tx.mediaAsset.update({ where: { id: req.imageMediaId }, data: { isPublic: true } });
@@ -216,7 +217,7 @@ export class SponsorRequestsService {
         },
         select: { id: true, status: true, startsAt: true, endsAt: true },
       });
-      await tx.sponsorRequest.update({ where: { id }, data: { sponsorId: sid, slideId: slide.id } });
+      await tx.sponsorRequest.update({ where: { id }, data: { slideId: slide.id } });
       const hasRole = await tx.userRole.findFirst({ where: { userId: req.userId, role: 'sponsor_viewer', sponsorId: sid } });
       if (!hasRole) await tx.userRole.create({ data: { userId: req.userId, role: 'sponsor_viewer', sponsorId: sid } });
       await this.audit.record({
