@@ -63,6 +63,18 @@ jobs:
           eas whoami
       - name: البناء على خوادم Expo (نحو 20–40 دقيقة)
         run: eas build --platform ios --profile production --non-interactive --wait --json > build.json && cat build.json
+      - name: سبب الفشل من سجل EAS
+        if: failure()
+        run: |
+          eas build:list --platform ios --limit 1 --json --non-interactive > last.json || exit 0
+          node -e "
+          const b=JSON.parse(require('fs').readFileSync('last.json'))[0]||{};
+          console.log('البناء:',b.id,'الحالة:',b.status);
+          console.log('الخطأ:',JSON.stringify(b.error||{}));
+          require('fs').writeFileSync('logs.txt',(b.logFiles||[]).join('\\n'));"
+          i=0; while read -r u; do [ -n "$u" ] || continue; i=$((i+1)); curl -sSL "$u" -o "log$i.txt" || true; done < logs.txt
+          for f in log*.txt; do [ -f "$f" ] || continue; node -e "
+          for (const l of require('fs').readFileSync('$f','utf8').split('\\n')) { try { const j=JSON.parse(l); if (j.msg) console.log((j.phase||'')+' | '+j.msg.trimEnd()); } catch { if (l.trim()) console.log(l); } }" | tail -150; done
       - name: الرفع إلى App Store Connect ← TestFlight
         run: |
           id=$(node -e "const b=JSON.parse(require('fs').readFileSync('build.json'));process.stdout.write((Array.isArray(b)?b[0]:b).id)")
