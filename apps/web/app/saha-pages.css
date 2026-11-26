@@ -292,3 +292,35 @@ a.team{color:inherit}
 .sponsor-banner img{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain}
 a.sponsor-banner:focus-visible{outline:3px solid #F2B705;outline-offset:3px}
 .banner-preview{display:block;width:100%;height:auto;aspect-ratio:16/9;object-fit:contain;background:#0E1A24;border-radius:var(--radius-sm)}
+/* الجوائز (الجلسة 16) */
+.prizes{background:#0E1A24;color:#fff;border-radius:var(--radius-md);padding:22px;display:flex;flex-direction:column;gap:14px;border:2px solid #F2B705}
+.prizes h2,.prizes h3{color:#fff}
+.prizes h3{font-size:18px;margin-top:4px}
+.prizes-head{display:flex;align-items:center;gap:14px}
+.prizes-head svg{width:40px;height:40px;color:#F2B705;flex:none}
+.prizes-head p{margin:2px 0 0;color:#C9D3D9}
+.prizes-head p b{color:#F2B705;font-size:20px}
+.prize-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.prize-card{background:#16263A;border:1px solid #2A3B49;border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.prize-card.r1{border-color:#F2B705;background:linear-gradient(160deg,#2A2610,#16263A 60%)}
+.prize-medal{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-display);font-weight:800;color:#0E1A24;background:#F2B705}
+.prize-card.r2 .prize-medal{background:#C9D3D9}
+.prize-card.r3 .prize-medal{background:#D49A6A}
+.prize-label{font-weight:600;color:#DCEDE6}
+.prize-amount{font-family:var(--font-display);font-size:24px;color:#F2B705;line-height:1.2}
+.prize-extra{color:#fff;font-size:14px}
+.prize-winner{display:flex;align-items:center;gap:8px}
+.prize-winner span{display:flex;flex-direction:column}
+.prize-winner small,.prize-tbd{color:#9FB0BA !important;font-size:13px}
+.archive{display:flex;flex-direction:column;gap:18px}
+.archive-card{padding:18px;display:flex;flex-direction:column;gap:12px}
+.archive-card h2{font-size:20px}
+.archive-sum{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.archive-sum b{font-family:var(--font-display);font-size:20px;color:var(--color-primary)}
+.wrap-row{flex-wrap:wrap}
+.prize-admin{display:flex;flex-direction:column;gap:10px}
+.prize-admin .prize-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end}
+.suggest{font-size:13px}
+.prizes .badge.s-scheduled{background:rgba(255,255,255,.1);color:#DCEDE6}
+.prizes .badge.s-provisional{background:rgba(92,157,255,.18);color:#A9CBFF}
+.prizes .badge.s-confirmed{background:rgba(47,163,122,.22);color:#6FE0B4}

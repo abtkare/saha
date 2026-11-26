@@ -50,7 +50,16 @@ writeFileSync(`${OUT}/ids.json`, JSON.stringify({ running: running.slug, match: 
 // يمنح الحكم دوره ويعيّنه للمباراة ويجعل موعدها قد مضى (يتم في الخطوة التالية من الـ workflow عبر psql)
 console.log(`REF_ID=${refMe.id} MATCH_ID=${match.id}`);
 writeFileSync(`${OUT}/../ref.sql`, `INSERT INTO user_roles (user_id, role) VALUES (${refMe.id}, 'referee'); UPDATE matches SET referee_id=${refMe.id}, kickoff_at = now() - interval '2 hours' WHERE id=${match.id};
-INSERT INTO notifications (user_id, title_ar, body_ar, data) VALUES (${refMe.id}, 'مباراتك بعد قليل', 'شباب الكرادة × صقور المنصور الساعة 16:00 — بطولة ساحات بغداد.', '{"type":"match.reminder","matchId":${match.id}}'), (${refMe.id}, 'نتيجة بانتظار تأكيدك', 'أكّد النتيجة أو اعترض قبل انتهاء المهلة.', '{"type":"result.entered","matchId":${anyMatch.id}}');`);
+INSERT INTO notifications (user_id, title_ar, body_ar, data) VALUES (${refMe.id}, 'مباراتك بعد قليل', 'شباب الكرادة × صقور المنصور الساعة 16:00 — بطولة ساحات بغداد.', '{"type":"match.reminder","matchId":${match.id}}'), (${refMe.id}, 'نتيجة بانتظار تأكيدك', 'أكّد النتيجة أو اعترض قبل انتهاء المهلة.', '{"type":"result.entered","matchId":${anyMatch.id}}');
+-- الجلسة 16: جوائز البطولة الجارية معلنة، وجائزة المركز الأول مسلّمة لفريق مدير التجربة (يظهر له زر تأكيد الاستلام)
+INSERT INTO prizes (tournament_id, category, rank, amount_iqd, extra_ar, team_id, status, awarded_at, delivered_at, updated_at) VALUES
+  (${running.id}, 'team_place', 1, 3000000, 'كأس البطولة', ${created.id}, 'delivered', now(), now(), now()),
+  (${running.id}, 'team_place', 2, 1500000, NULL, NULL, 'pending', NULL, NULL, now()),
+  (${running.id}, 'team_place', 3, 750000, NULL, NULL, 'pending', NULL, NULL, now()),
+  (${running.id}, 'best_player', 1, 500000, NULL, NULL, 'pending', NULL, NULL, now()),
+  (${running.id}, 'best_player', 2, 250000, NULL, NULL, 'pending', NULL, NULL, now()),
+  (${running.id}, 'best_player', 3, 0, 'ميدالية ذهبية', NULL, 'pending', NULL, NULL, now());
+UPDATE tournaments SET prizes_announced_at = now() WHERE id = ${running.id};`);
 if (process.argv[3] !== '--shots') process.exit(0);
 
 // ───── اللقطات ─────
@@ -80,6 +89,8 @@ open('myteams', q('light', mgr)); await shot('30-myteams-manager', 6000);
 open(`manage/${created.id}`, q('light')); await shot('31-team-manage');
 open('account', q('light')); await shot('32-account');
 open('family', q('light')); await shot('33-family');
+open('prizes/mine', q('light')); await shot('34-my-prizes');
+open('prizes', q('dark')); await shot('35-prize-archive-dark');
 // الحكم
 open('myteams', q('dark', ref)); await shot('40-myteams-referee-dark', 6000);
 open(`result/${match.id}`, q('dark')); await shot('41-result-entry-dark');

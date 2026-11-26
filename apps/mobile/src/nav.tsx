@@ -26,6 +26,8 @@ export type Route =
   | { name: 'search' }
   | { name: 'sponsorRequest'; tournamentId?: number; matchId?: number }
   | { name: 'sponsorRequests' }
+  | { name: 'myPrizes' }
+  | { name: 'prizeArchive' }
   | { name: 'page'; slug: 'terms' | 'privacy' | 'contact' };
 
 interface Entry { key: number; route: Route; closing?: boolean }
@@ -68,6 +70,8 @@ export function routeFromPath(path: string): { tab?: TabName; route?: Route } | 
     case 'family': return { tab: 'account', route: { name: 'family' } };
     case 'search': return { route: { name: 'search' } };
     case 'sponsor-requests': return { tab: 'account', route: { name: 'sponsorRequests' } };
+    case 'prizes': return b === 'mine' ? { tab: 'account', route: { name: 'myPrizes' } } : { route: { name: 'prizeArchive' } };
+    case 'my-prizes': return { tab: 'account', route: { name: 'myPrizes' } };
     case 'terms': case 'privacy': case 'contact': return { route: { name: 'page', slug: a } };
     default: return null;
   }

@@ -42,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/#matches">المباريات</a>
               <a href="/tournaments">البطولات</a>
               <a href="/news">الأخبار</a>
+              <a href="/prizes">الجوائز</a>
               <a href="/sponsor">كن راعياً</a>
             </nav>
             <div className="top-act">

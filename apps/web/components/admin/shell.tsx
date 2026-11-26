@@ -10,6 +10,7 @@ const any = (...p: Permission[]) => (s: Session) => p.some((x) => s.canSome(x));
 export const NAV: NavItem[] = [
   { href: '/admin', label: 'لوحة المؤشرات', show: () => true },
   { href: '/admin/tournaments', label: 'البطولات', show: any('tournaments.manage') },
+  { href: '/admin/prizes', label: 'الجوائز', show: any('tournaments.manage') },
   { href: '/admin/matches', label: 'المباريات والنتائج', show: any('results.enter') },
   { href: '/admin/disputes', label: 'الاعتراضات', show: any('disputes.decide') },
   { href: '/admin/verifications', label: 'توثيق الفرق', show: (s) => s.can('tournaments.manage') },

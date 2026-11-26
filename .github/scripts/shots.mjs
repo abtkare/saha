@@ -93,6 +93,25 @@ try {
     await shot('19-admin-audit-dark', '/admin/audit', D, { tokens: t, theme: 'dark' });
     await shot('20-sponsor-portal', '/sponsor/portal?sponsorId=1', D, { tokens: t });
     await shot('21-sponsor-portal-mobile', '/sponsor/portal?sponsorId=1', M, { tokens: t });
+    // الجلسة 16: جوائز البطولة التجريبية — قيم، فائز للمركز الأول، إعلان
+    const tok = t.accessToken;
+    const req = async (method, path, body) => {
+      const r = await fetch(`${BASE}/api/v1${path}`, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${tok}` }, body: body ? JSON.stringify(body) : undefined });
+      const x = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(`${method} ${path} ${r.status} ${JSON.stringify(x)}`);
+      return x;
+    };
+    const vals = [['team_place', 1, 3000000, 'كأس البطولة'], ['team_place', 2, 1500000], ['team_place', 3, 750000], ['best_player', 1, 500000], ['best_player', 2, 250000], ['best_player', 3, 0, 'ميدالية ذهبية']];
+    const made = [];
+    for (const [category, rank, amountIqd, extraAr] of vals) made.push(await req('POST', '/admin/prizes', { tournamentId: j.id, category, rank, amountIqd, ...(extraAr ? { extraAr } : {}) }));
+    await req('PATCH', `/admin/prizes/${made[0].id}`, { teamId: team });
+    await req('POST', `/admin/prizes/${made[0].id}/deliver`, { note: 'نقداً في حفل الختام' });
+    await req('POST', `/admin/tournaments/${j.id}/prizes/announce`, { announced: true, notify: false });
+    await shot('22-web-tournament-prizes', `/tournaments/baghdad-sahat-2026`, D);
+    await shot('23-web-tournament-prizes-dark-mobile', `/tournaments/baghdad-sahat-2026`, M, { theme: 'dark' });
+    await shot('24-admin-prizes', `/admin/prizes?t=${j.id}`, D, { tokens: t });
+    await shot('25-admin-prizes-mobile', `/admin/prizes?t=${j.id}`, M, { tokens: t });
+    await shot('26-web-prizes-archive', '/prizes', D);
   }
 } finally {
   sock.close(); chrome.kill();

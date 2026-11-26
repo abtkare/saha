@@ -286,3 +286,36 @@ export function isExpoPushToken(token: unknown): token is string {
  * matchId ← شاشة المباراة، tournamentId ← البطولة، teamId ← الفريق، disputeId ← المباراة المعنية.
  */
 export interface NotificationTarget { matchId?: number; tournamentId?: number; teamId?: number; disputeId?: number }
+
+// ───────────── الجوائز (الجلسة 16) ─────────────
+
+export const PRIZE_CATEGORIES = ['team_place', 'best_player'] as const;
+export type PrizeCategory = (typeof PRIZE_CATEGORIES)[number];
+export const PRIZE_STATUSES = ['pending', 'awarded', 'delivered', 'confirmed'] as const;
+export type PrizeStatus = (typeof PRIZE_STATUSES)[number];
+
+export const PRIZE_CATEGORY_LABELS: Record<PrizeCategory, string> = {
+  team_place: 'المراكز الثلاثة الأولى',
+  best_player: 'أفضل ثلاثة لاعبين',
+};
+
+export const PRIZE_STATUS_LABELS: Record<PrizeStatus, string> = {
+  pending: 'الفائز لم يُحدَّد',
+  awarded: 'بانتظار التسليم',
+  delivered: 'سُلّمت — بانتظار تأكيد المستفيد',
+  confirmed: 'سُلّمت وأكّد المستفيد الاستلام',
+};
+
+const PLACE_WORDS = ['الأول', 'الثاني', 'الثالث'];
+
+/** اسم الجائزة: «المركز الأول» أو «أفضل لاعب — الثاني»، أو الاسم المخصص إن وُجد */
+export function prizeLabel(category: PrizeCategory, rank: number, titleAr?: string | null): string {
+  if (titleAr) return titleAr;
+  const w = PLACE_WORDS[rank - 1] ?? String(rank);
+  return category === 'team_place' ? `المركز ${w}` : `أفضل لاعب — ${w}`;
+}
+
+/** مبلغ بالدينار بأرقام 0–9 وفواصل: 1,500,000 د.ع */
+export function formatIqd(amount: number): string {
+  return `${new Intl.NumberFormat('en-US').format(amount)} د.ع`;
+}
