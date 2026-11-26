@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 358 201" width="1600" height="900" preserveAspectRatio="xMidYMid slice">
+  <!-- أرضية الملعب من التصميم الأصلي (لوحة التصاميم ← رئيسية التطبيق ← الشرائح الرئيسية) -->
+  <rect width="358" height="201" fill="#0B6E4F"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="1.5" opacity=".16">
+    <circle cx="179" cy="100" r="46"/>
+    <path d="M179 0 V201 M0 52 H38 V149 H0 M358 52 H320 V149 H358"/>
+  </g>
+</svg>

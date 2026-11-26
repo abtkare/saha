@@ -9,7 +9,7 @@ import { useNav } from '../nav';
 import { radius, row, T, useTheme } from '../theme';
 import { kickoffDay, kickoffTime, relativeTime, scoreText, shortDate, signed } from '../format';
 import type { Banner, Hero, HeroSlide, MatchItem, NewsItem, StandingRow, TeamRef, TournamentSummary, Zone } from '../types';
-import { Icon, Mark, PitchLines } from './icons';
+import { Icon, PitchLines } from './icons';
 import { Avatar, Card, Chip, Crest, Progress, StatusBadge } from './ui';
 
 /** بطاقة المباراة: الشعاران والنتيجة وشارة الحالة تحتها، ثم الوقت والملعب */
@@ -291,13 +291,12 @@ function MatchSlide({ s, w, h }: { s: HeroSlide; w: number; h: number }) {
 }
 
 function ImageSlide({ s, w, h }: { s: HeroSlide; w: number; h: number }) {
-  // أرضية الملعب ترسم دائماً تحت الصورة: إن تأخرت الصورة أو فشل تحميلها تبقى الشريحة بشكل الملعب لا خضراء فارغة
+  // كما في التصميم الأصلي: أرضية الملعب ترسم دائماً، والصورة (إن وُجدت وحُمّلت) فوقها
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [s.imageUrl]);
   return (
     <View style={{ flex: 1, backgroundColor: '#0B6E4F' }}>
       <PitchLines width={w} height={h} />
-      <View style={{ position: 'absolute', top: 18, left: 18, opacity: 0.35 }}><Mark size={72} color="#FFFFFF" /></View>
       {s.imageUrl && !failed ? (
         <Image source={{ uri: absolute(s.imageUrl) }} style={{ position: 'absolute', width: w, height: h }} resizeMode="cover" onError={() => setFailed(true)} />
       ) : null}
