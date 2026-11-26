@@ -321,3 +321,6 @@ a.sponsor-banner:focus-visible{outline:3px solid #F2B705;outline-offset:3px}
 .prize-admin{display:flex;flex-direction:column;gap:10px}
 .prize-admin .prize-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end}
 .suggest{font-size:13px}
+.prizes .badge.s-scheduled{background:rgba(255,255,255,.1);color:#DCEDE6}
+.prizes .badge.s-provisional{background:rgba(92,157,255,.18);color:#A9CBFF}
+.prizes .badge.s-confirmed{background:rgba(47,163,122,.22);color:#6FE0B4}
