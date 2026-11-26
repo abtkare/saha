@@ -112,6 +112,13 @@ try {
     await shot('24-admin-prizes', `/admin/prizes?t=${j.id}`, D, { tokens: t });
     await shot('25-admin-prizes-mobile', `/admin/prizes?t=${j.id}`, M, { tokens: t });
     await shot('26-web-prizes-archive', '/prizes', D);
+    // الجلسة 17: بيانات العرض — خمس بطولات بكل الحالات
+    await req('POST', '/admin/demo/showcase');
+    await shot('27-admin-dashboard-showcase', '/admin', D, { tokens: t });
+    await shot('28-web-home-showcase', '/', D);
+    await shot('29-web-knockout-finished', '/tournaments/demo-abuhaider-cup', D);
+    await shot('30-web-groups-running-mobile', '/tournaments/demo-basra-groups', M);
+    await shot('31-web-prizes-archive-showcase', '/prizes', D);
   }
 } finally {
   sock.close(); chrome.kill();

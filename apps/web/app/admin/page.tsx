@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '@/components/auth';
 import { NAV } from '@/components/admin/shell';
-import { PageHead } from '@/components/admin/kit';
+import { ConfirmButton, Note, PageHead, useAction } from '@/components/admin/kit';
 import { api } from '@/lib/client';
 
 interface Tile { key: string; label: string; href: string; value: number | null; tone?: 'gold' | 'danger' | 'info' }
@@ -49,6 +49,7 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+      {s.me?.mfa && s.me.roles.some((r) => r.role === 'super_admin') && <Showcase />}
       <h2 className="admin-h2">الأقسام</h2>
       <div className="grid g200">
         {sections.map((n) => <a key={n.href} href={n.href} className="card section-link"><b>{n.label}</b></a>)}
@@ -56,3 +57,29 @@ export default function Dashboard() {
     </>
   );
 }
+
+/** بيانات العرض: 5 بطولات وهمية تُظهر كل خصائص المنصة، تُنشأ وتُحذف بضغطة (المدير العام فقط) */
+function Showcase() {
+  const [st, setSt] = useState<{ exists: boolean; tournaments: number } | null>(null);
+  const act = useAction();
+  const load = () => api<{ exists: boolean; tournaments: number }>('/admin/demo/showcase').then(setSt).catch(() => setSt(null));
+  useEffect(() => { void load(); }, []);
+  if (!st) return null;
+  return (
+    <div className="card form-card">
+      <div className="between wrap-row">
+        <b>بيانات العرض التجريبية</b>
+        <span className={`badge ${st.exists ? 's-confirmed' : 's-scheduled'}`}>{st.exists ? `موجودة — ${st.tournaments} بطولات` : 'غير موجودة'}</span>
+      </div>
+      <p className="muted">خمس بطولات وهمية تُظهر كل خصائص المنصة: خروج المغلوب منتهٍ بشجرة كاملة، دوري منتهٍ، مجموعات ثم خروج المغلوب بمباراة مباشرة اليوم، دوري جارٍ، وبطولة بالتسجيل — مع الهدافين وأفضل اللاعبين والجوائز بكل حالاتها وسجل الجوائز وأخبار. الحذف يزيلها وحدها ولا يمس أي بيانات أخرى.</p>
+      <div className="row">
+        {!st.exists && <ConfirmButton className="btn btn-gold" disabled={act.busy} confirm="إنشاء 5 بطولات وهمية بفرقها ومبارياتها وجوائزها؟" onClick={() => void act.run(async () => { await api('/admin/demo/showcase', { method: 'POST' }); await load(); }, 'أُنشئت بيانات العرض. افتح الرئيسية أو صفحة «الجوائز» لتراها.')}>{act.busy ? 'جارٍ الإنشاء…' : 'أنشئ بيانات العرض'}</ConfirmButton>}
+        {st.exists && <a className="btn btn-sm" href="/tournaments" target="_blank" rel="noopener noreferrer">البطولات</a>}
+        {st.exists && <a className="btn btn-sm" href="/prizes" target="_blank" rel="noopener noreferrer">سجل الجوائز</a>}
+        {st.exists && <ConfirmButton disabled={act.busy} confirm="حذف كل بيانات العرض (البطولات الخمس وفرقها وأخبارها)؟" onClick={() => void act.run(async () => { await api('/admin/demo/showcase', { method: 'DELETE' }); await load(); }, 'حُذفت بيانات العرض.')}>احذف بيانات العرض</ConfirmButton>}
+      </div>
+      <Note note={act.note} />
+    </div>
+  );
+}
+
