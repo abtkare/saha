@@ -113,3 +113,18 @@ export interface Verification { id: number; code: string; status: string; postUr
 
 export interface Child { id: number; firstName: string; birthYear: number; mediaConsent: boolean; consentAt: string | null; teams: { team: { id: number; nameAr: string } }[] }
 export interface Ward { id: number; fullName: string; birthYear: number | null; status: string; createdAt: string }
+
+/** الجوائز (الجلسة 16) */
+export interface Prize {
+  id: number; category: 'team_place' | 'best_player'; rank: number; label: string; titleAr: string | null;
+  amountIqd: number; extraAr: string | null; status: 'pending' | 'awarded' | 'delivered' | 'confirmed';
+  team: TeamRef | null; player: { id: number; name: string } | null;
+  awardedAt: string | null; deliveredAt: string | null; confirmedAt: string | null;
+}
+export interface TournamentPrizes { announcedAt: string | null; totalIqd: number; prizes: Prize[] }
+export type MyPrize = Prize & { tournament: { id: number; nameAr: string; slug: string }; deliveryNote: string | null; canConfirm: boolean };
+export interface PrizeArchive {
+  totals: { tournaments: number; prizes: number; amountIqd: number; confirmed: number };
+  tournaments: { tournament: { id: number; nameAr: string; slug: string; endsOn: string | null }; totalIqd: number; delivered: number; confirmed: number; prizes: Prize[] }[];
+  next: string | null;
+}

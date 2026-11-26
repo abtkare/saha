@@ -170,6 +170,11 @@ jobs:
           curl -sf localhost:8098/privacy | grep -q 'الخصوصية'
           curl -sf localhost:8098/app | grep -q 'تطبيق ساحة'
           curl -sf localhost:8098/admin > /dev/null
+          curl -sf localhost:8098/prizes | grep -q 'سجل الجوائز'
+          curl -sf localhost:8098/prizes/mine > /dev/null
+          curl -sf localhost:8098/admin/prizes > /dev/null
+          curl -sf "localhost:8098/api/v1/prizes/archive" | grep -q '"totals"'
+          curl -sf "localhost:8098/api/v1/tournaments/baghdad-sahat-2026/prizes" | grep -q '"prizes"'
           # الجلسة 7: خادم التطبيق لـ Expo Go
           curl -sf localhost:8098/app | grep -q 'exp://localhost:8098/expo'
           curl -sf localhost:8098/app | grep -q 'exp://u.expo.dev/e971c618-1a3d-49f3-8c3d-ddf5bd31ce29?runtime-version=exposdk%3A58.0.0&amp;channel-name=production'

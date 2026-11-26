@@ -97,6 +97,14 @@ export function AccountScreen() {
               </Card>
             </Section>
 
+            <Section title="الجوائز">
+              <Card flush>
+                <ListRow title="جوائزي" subtitle="جوائزك وجوائز فريقك، وتأكيد الاستلام" icon="trophy" onPress={() => push({ name: 'myPrizes' })} />
+                <Divider />
+                <ListRow title="سجل الجوائز" subtitle="جوائز البطولات السابقة وفائزوها" icon="flag" onPress={() => push({ name: 'prizeArchive' })} />
+              </Card>
+            </Section>
+
             <Section title="الرعاية">
               <Card flush>
                 <ListRow title="اطلب رعاية بطولة أو مباراة" subtitle="شريحتك في الشاشة الرئيسية لجمهور ساحة" icon="trophy" onPress={() => push({ name: 'sponsorRequest' })} />

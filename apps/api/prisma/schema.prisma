@@ -156,6 +156,22 @@ enum PostType {
   @@map("post_type")
 }
 
+enum PrizeCategory {
+  team_place
+  best_player
+
+  @@map("prize_category")
+}
+
+enum PrizeStatus {
+  pending
+  awarded
+  delivered
+  confirmed
+
+  @@map("prize_status")
+}
+
 // ───────────── الحسابات ─────────────
 
 model User {
@@ -297,6 +313,8 @@ model Tournament {
   /// بذرة القرعة — تُحفظ ليُعاد حساب القرعة نفسها والتحقق منها
   drawSeed         String?          @map("draw_seed")
   drawnAt          DateTime?        @map("drawn_at") @db.Timestamptz(3)
+  /// وقت إعلان الجوائز للجمهور (الجلسة 16) — قبلها لا تظهر الجوائز إلا في اللوحة
+  prizesAnnouncedAt DateTime?       @map("prizes_announced_at") @db.Timestamptz(3)
   status           TournamentStatus @default(draft)
   createdById      Int?             @map("created_by_id")
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -309,6 +327,7 @@ model Tournament {
   roles         UserRole[]
   heroSlides    HeroSlide[]
   sponsorRequests SponsorRequest[]
+  prizes        Prize[]
 
   @@index([kind, status])
   @@index([communityId, communityKind])
@@ -343,6 +362,7 @@ model Team {
   matchEvents          MatchEvent[]
   disputes             Dispute[]
   roles                UserRole[]
+  prizes               Prize[]
 
   @@index([managerId])
   @@index([communityId])
@@ -387,6 +407,7 @@ model Player {
   guardian User?        @relation("PlayerGuardian", fields: [guardianId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   teams    TeamPlayer[]
   events   MatchEvent[]
+  prizes   Prize[]
 
   @@index([guardianId])
   @@map("players")
@@ -576,6 +597,45 @@ model SponsorBanner {
 
   @@index([isActive, sortOrder])
   @@map("sponsor_banners")
+}
+
+/// الجوائز (الجلسة 16): المراكز الثلاثة الأولى (team_place) وأفضل ثلاثة لاعبين (best_player) لكل بطولة.
+/// القيمة تُحدَّد من اللوحة، والفائز يُختار، ثم «سُلّمت» من الإدارة، ثم «أكّد الاستلام» من المستفيد.
+/// الجائزة المؤكَّدة مجمّدة في القاعدة نفسها (Trigger) لتبقى في الأرشيف كما هي.
+model Prize {
+  id            Int           @id @default(autoincrement())
+  tournamentId  Int           @map("tournament_id")
+  category      PrizeCategory
+  /// المركز 1 أو 2 أو 3
+  rank          Int
+  /// اسم مخصص اختياري (مثل «الهداف»)؛ الافتراضي من الفئة والمركز
+  titleAr       String?       @map("title_ar")
+  amountIqd     Int           @default(0) @map("amount_iqd")
+  /// جائزة عينية مع المبلغ أو بدونه (مثل «كأس + ميداليات»)
+  extraAr       String?       @map("extra_ar")
+  /// الفريق الفائز، وفي جائزة اللاعب: فريق اللاعب
+  teamId        Int?          @map("team_id")
+  playerId      Int?          @map("player_id")
+  status        PrizeStatus   @default(pending)
+  awardedAt     DateTime?     @map("awarded_at") @db.Timestamptz(3)
+  deliveredAt   DateTime?     @map("delivered_at") @db.Timestamptz(3)
+  deliveredById Int?          @map("delivered_by_id")
+  deliveryNote  String?       @map("delivery_note")
+  confirmedAt   DateTime?     @map("confirmed_at") @db.Timestamptz(3)
+  confirmedById Int?          @map("confirmed_by_id")
+  updatedById   Int?          @map("updated_by_id")
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team       Team?      @relation(fields: [teamId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  player     Player?    @relation(fields: [playerId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([tournamentId, category, rank])
+  @@index([status])
+  @@index([teamId])
+  @@index([playerId])
+  @@map("prizes")
 }
 
 model HeroSlide {
