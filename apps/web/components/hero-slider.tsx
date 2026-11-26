@@ -5,7 +5,6 @@ import type { Hero, HeroSlide, MatchItem } from '@/lib/api';
 import { deviceId } from '@/lib/client';
 import { initial, kickoffTime, scoreText } from '@/lib/format';
 import { LiveCard } from './cards';
-import { Mark } from './mark';
 
 const AUTO_MS = 6000;
 
@@ -39,9 +38,12 @@ function MatchSlide({ s }: { s: HeroSlide }) {
 }
 
 function ImageSlide({ s }: { s: HeroSlide }) {
+  // كما في التصميم الأصلي: بلا صورة (أو فشل تحميلها) تظهر أرضية الملعب
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [s.imageUrl]);
   return (
     <>
-      {s.imageUrl ? <img src={s.imageUrl} alt="" className="slide-bg" /> : <span className="slide-bg ph"><Mark size={96} /></span>}
+      {s.imageUrl && !failed ? <img src={s.imageUrl} alt="" className="slide-bg" onError={() => setFailed(true)} /> : <img src="/slides/pitch.svg" alt="" className="slide-bg" />}
       {s.sponsored && <span className="badge gold slide-badge">برعاية{s.sponsor ? ` ${s.sponsor.nameAr}` : ''}</span>}
       <span className="slide-text">
         <b>{s.titleAr}</b>
