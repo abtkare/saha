@@ -39,9 +39,12 @@ function MatchSlide({ s }: { s: HeroSlide }) {
 }
 
 function ImageSlide({ s }: { s: HeroSlide }) {
+  // إن فشل تحميل الصورة تظهر الخلفية البديلة بدل مساحة فارغة
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [s.imageUrl]);
   return (
     <>
-      {s.imageUrl ? <img src={s.imageUrl} alt="" className="slide-bg" /> : <span className="slide-bg ph"><Mark size={96} /></span>}
+      {s.imageUrl && !failed ? <img src={s.imageUrl} alt="" className="slide-bg" onError={() => setFailed(true)} /> : <span className="slide-bg ph"><Mark size={96} /></span>}
       {s.sponsored && <span className="badge gold slide-badge">برعاية{s.sponsor ? ` ${s.sponsor.nameAr}` : ''}</span>}
       <span className="slide-text">
         <b>{s.titleAr}</b>

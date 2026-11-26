@@ -291,14 +291,16 @@ function MatchSlide({ s, w, h }: { s: HeroSlide; w: number; h: number }) {
 }
 
 function ImageSlide({ s, w, h }: { s: HeroSlide; w: number; h: number }) {
+  // أرضية الملعب ترسم دائماً تحت الصورة: إن تأخرت الصورة أو فشل تحميلها تبقى الشريحة بشكل الملعب لا خضراء فارغة
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [s.imageUrl]);
   return (
     <View style={{ flex: 1, backgroundColor: '#0B6E4F' }}>
-      {s.imageUrl ? <Image source={{ uri: absolute(s.imageUrl) }} style={{ position: 'absolute', width: w, height: h }} resizeMode="cover" /> : (
-        <>
-          <PitchLines width={w} height={h} />
-          <View style={{ position: 'absolute', top: 18, left: 18, opacity: 0.35 }}><Mark size={72} color="#FFFFFF" /></View>
-        </>
-      )}
+      <PitchLines width={w} height={h} />
+      <View style={{ position: 'absolute', top: 18, left: 18, opacity: 0.35 }}><Mark size={72} color="#FFFFFF" /></View>
+      {s.imageUrl && !failed ? (
+        <Image source={{ uri: absolute(s.imageUrl) }} style={{ position: 'absolute', width: w, height: h }} resizeMode="cover" onError={() => setFailed(true)} />
+      ) : null}
       {/* تدرّج داكن أسفل الصورة للنص (طبقات بدل مكتبة تدرّج) */}
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: h * 0.7 }}>
         {[0.04, 0.1, 0.18, 0.28, 0.4, 0.52, 0.62, 0.7].map((o, k) => (
