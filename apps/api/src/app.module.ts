@@ -23,6 +23,7 @@ import { SponsorRequestsController, SponsorRequestsService } from './content/spo
 import { BannersAdminController, BannersPublicController, BannersService } from './content/banners';
 import { PostsAdminController, PostsPublicController, PostsService } from './content/posts';
 import { PrizesAdminController, PrizesPublicController, PrizesService } from './prizes/prizes';
+import { ShowcaseController, ShowcaseService } from './demo/showcase';
 
 @Module({
   imports: [PrismaModule, AuditModule, AuthModule],
@@ -35,11 +36,12 @@ import { PrizesAdminController, PrizesPublicController, PrizesService } from './
     HeroController, SlidesAdminController, SponsorLeadsPublicController, SponsorsController, SponsorRequestsController, PostsPublicController, PostsAdminController,
     BannersPublicController, BannersAdminController,
     PrizesPublicController, PrizesAdminController,
+    ShowcaseController,
   ],
   providers: [
     TournamentsService, TournamentManageService, MatchesService, MatchManageService, TeamsService,
     ResultsService, ResultSweeper, NotificationsService, PushService, UploadsService,
-    SlidesService, SponsorsService, SponsorRequestsService, PostsService, BannersService, PrizesService,
+    SlidesService, SponsorsService, SponsorRequestsService, PostsService, BannersService, PrizesService, ShowcaseService,
   ],
 })
 export class AppModule {}

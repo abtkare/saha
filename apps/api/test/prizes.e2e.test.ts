@@ -239,3 +239,40 @@ describe('الجلسة 16 — الجوائز', () => {
     expect((await api('GET', '/admin/prizes', undefined, outsider.token)).status).toBe(403);
   });
 });
+
+describe('الجلسة 17 — بيانات العرض', () => {
+  it('المدير العام ينشئ بيانات العرض مرة واحدة، وتظهر كل الحالات، ثم يحذفها كاملة', async () => {
+    expect((await api('POST', '/admin/demo/showcase', undefined, tm.token)).status).toBe(403);
+    const c = await api('POST', '/admin/demo/showcase', undefined, admin);
+    expect(c.status, JSON.stringify(c.body)).toBe(201);
+    expect(c.body).toMatchObject({ created: true, tournaments: 5, prizes: 30 });
+    expect((await api('POST', '/admin/demo/showcase', undefined, admin)).body.code).toBe('SHOWCASE_EXISTS');
+    expect((await api('GET', '/admin/demo/showcase', undefined, admin)).body).toMatchObject({ exists: true, tournaments: 5 });
+
+    // خروج المغلوب منتهٍ: بطل ووصيف، والجوائز في الأرشيف
+    const road = await api('GET', '/tournaments/demo-abuhaider-cup/road');
+    expect(road.body.champion).toBeTruthy();
+    const arc = await api('GET', '/prizes/archive?limit=50');
+    const slugs = arc.body.tournaments.map((x: any) => x.tournament.slug);
+    expect(slugs).toEqual(expect.arrayContaining(['demo-abuhaider-cup', 'demo-nasiriyah-league']));
+    const cup = arc.body.tournaments.find((x: any) => x.tournament.slug === 'demo-abuhaider-cup');
+    expect(cup.confirmed).toBe(5);
+    expect(cup.prizes[0].team.id).toBe(road.body.champion.id);
+    // الجارية: مجموعتان ونصف نهائي، والجوائز معلنة بلا فائز
+    const basra = await api('GET', '/tournaments/demo-basra-groups/prizes');
+    expect(basra.body.prizes).toHaveLength(6);
+    expect(basra.body.prizes.every((p: any) => p.status === 'pending')).toBe(true);
+    expect((await api('GET', '/tournaments/demo-basra-groups/stars')).body.topScorers.length).toBeGreaterThan(0);
+    expect((await api('GET', '/tournaments/demo-ali-challenge/road')).body.league).toHaveLength(6);
+
+    const d = await api('DELETE', '/admin/demo/showcase', undefined, admin);
+    expect(d.status, JSON.stringify(d.body)).toBe(200);
+    expect(d.body).toMatchObject({ deleted: true, tournaments: 5, teams: 31 });
+    expect((await api('GET', '/tournaments/demo-abuhaider-cup')).status).toBe(404);
+    const left = await db.query(`SELECT count(*)::int AS c FROM users WHERE phone LIKE '+9647700002%'`);
+    expect(left.rows[0].c).toBe(0);
+    expect((await api('POST', '/admin/demo/showcase', undefined, admin)).status).toBe(201); // يمكن إنشاؤها من جديد
+    expect((await api('DELETE', '/admin/demo/showcase', undefined, admin)).status).toBe(200);
+  }, 120_000);
+});
+
