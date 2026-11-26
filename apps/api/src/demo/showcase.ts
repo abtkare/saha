@@ -92,7 +92,7 @@ export class ShowcaseService {
 
     const made: Made = { users: [], teams: [], players: [], communities: [], tournaments: [], posts: [], slides: [] };
     const summary = await this.prisma.$transaction(async (tx) => this.build(tx, auth.userId, made), { timeout: 120_000, maxWait: 10_000 });
-    await this.audit.record({ actorUserId: auth.userId, action: 'demo.showcase_create', entity: 'system', entityId: 0, payload: { ...made, ...summary } as unknown as Prisma.InputJsonValue, ip });
+    await this.audit.record({ actorUserId: auth.userId, action: 'demo.showcase_create', entity: 'system', entityId: 0, payload: { ids: made, summary } as unknown as Prisma.InputJsonValue, ip });
     return { created: true, ...summary };
   }
 
@@ -101,16 +101,19 @@ export class ShowcaseService {
     this.superAdmin(auth);
     const logs = await this.prisma.auditLog.findMany({ where: { action: 'demo.showcase_create' }, select: { payload: true }, orderBy: { id: 'desc' }, take: 5 });
     if (!logs.length) throw new AppError(404, 'SHOWCASE_NOT_FOUND', 'لا توجد بيانات عرض لحذفها.');
-    const ids = (k: keyof Made) => [...new Set(logs.flatMap((l) => ((l.payload as unknown as Partial<Made>)?.[k] ?? []) as number[]))];
+    const ids = (k: keyof Made) => [...new Set(logs.flatMap((l) => {
+      const v = (l.payload as { ids?: Partial<Made> } | null)?.ids?.[k];
+      return Array.isArray(v) ? v.filter((x): x is number => Number.isInteger(x)) : [];
+    }))];
     const counts = await this.prisma.$transaction(async (tx) => {
-      const slides = await tx.heroSlide.deleteMany({ where: { id: { in: ids('slides') } } });
-      const posts = await tx.post.deleteMany({ where: { id: { in: ids('posts') } } });
+      const slides = await tx.heroSlide.deleteMany({ where: { id: { in: ids('slides') }, tournament: { slug: { startsWith: 'demo-' } } } });
+      const posts = await tx.post.deleteMany({ where: { id: { in: ids('posts') }, slug: { startsWith: 'demo-' } } });
       const tours = await tx.tournament.deleteMany({ where: { id: { in: ids('tournaments') }, slug: { startsWith: 'demo-' } } });
-      await tx.teamPlayer.deleteMany({ where: { teamId: { in: ids('teams') } } });
-      const teams = await tx.team.deleteMany({ where: { id: { in: ids('teams') } } });
-      await tx.player.deleteMany({ where: { id: { in: ids('players') } } });
-      const users = await tx.user.deleteMany({ where: { id: { in: ids('users') }, phone: { startsWith: '+964770000' } } });
-      await tx.community.deleteMany({ where: { id: { in: ids('communities') } } });
+      await tx.teamPlayer.deleteMany({ where: { teamId: { in: ids('teams') }, team: { manager: { phone: { startsWith: '+9647700002' } } } } });
+      const teams = await tx.team.deleteMany({ where: { id: { in: ids('teams') }, manager: { phone: { startsWith: '+9647700002' } } } });
+      await tx.player.deleteMany({ where: { id: { in: ids('players') }, OR: [{ user: { phone: { startsWith: '+9647700002' } } }, { guardian: { phone: { startsWith: '+9647700002' } } }] } });
+      const users = await tx.user.deleteMany({ where: { id: { in: ids('users') }, phone: { startsWith: '+9647700002' } } });
+      await tx.community.deleteMany({ where: { id: { in: ids('communities') }, tournaments: { none: {} } } });
       return { tournaments: tours.count, teams: teams.count, users: users.count, posts: posts.count, slides: slides.count };
     }, { timeout: 60_000 });
     await this.audit.record({ actorUserId: auth.userId, action: 'demo.showcase_delete', entity: 'system', entityId: 0, payload: counts, ip });
