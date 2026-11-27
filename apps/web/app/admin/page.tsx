@@ -1,59 +1,95 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { TIMEZONE } from '@saha/shared';
 import { useSession } from '@/components/auth';
-import { NAV } from '@/components/admin/shell';
+import { NAV, NAV_GROUPS } from '@/components/admin/shell';
 import { ConfirmButton, Note, PageHead, useAction } from '@/components/admin/kit';
+import { AreaChart, Kpi, n0 } from '@/components/admin/charts';
+import { AIcon, type AdminIconName } from '@/components/admin/icons';
 import { api } from '@/lib/client';
 
-interface Tile { key: string; label: string; href: string; value: number | null; tone?: 'gold' | 'danger' | 'info' }
+interface Tile { key: string; label: string; href: string; icon: AdminIconName; value: number | null; sub: string; tone?: 'gold' | 'danger' | 'info' }
+interface Pulse { totals: { impressions: number; clicks: number; ctr: number }; change: { impressions: number | null; clicks: number | null }; series: { day: string; impressions: number }[] }
 
-/** لوحة المؤشرات — أرقام من الواجهات الموجودة بحسب صلاحيات المستخدم */
+const hello = () => {
+  const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: TIMEZONE, hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
+  return h < 12 ? 'صباح الخير' : 'مساء الخير';
+};
+
+/** لوحة المؤشرات — ما ينتظر القرار، نبض الرعاة، والأقسام بحسب صلاحيات المستخدم */
 export default function Dashboard() {
   const s = useSession();
   const [tiles, setTiles] = useState<Tile[]>([]);
+  const [pulse, setPulse] = useState<Pulse | null>(null);
+  const [greet, setGreet] = useState('أهلاً');
 
   useEffect(() => {
+    setGreet(hello());
     const jobs: [Tile, () => Promise<number>][] = [];
     const add = (t: Omit<Tile, 'value'>, fn: () => Promise<number>) => jobs.push([{ ...t, value: null }, fn]);
     const count = (p: string) => api<unknown[]>(p).then((r) => r.length);
     if (s.canSome('tournaments.manage')) {
-      add({ key: 'running', label: 'بطولات جارية', href: '/admin/tournaments' }, () => api<{ status: string }[]>('/admin/tournaments').then((r) => r.filter((t) => t.status === 'running').length));
-      add({ key: 'reg', label: 'بطولات بالتسجيل', href: '/admin/tournaments', tone: 'info' }, () => api<{ status: string }[]>('/admin/tournaments').then((r) => r.filter((t) => t.status === 'registration').length));
+      const tours = api<{ status: string; feesEnabled?: boolean; entryFeeIqd: number }[]>('/admin/tournaments');
+      add({ key: 'running', label: 'بطولات جارية', sub: 'تُلعب الآن', icon: 'trophy', href: '/admin/tournaments' }, () => tours.then((r) => r.filter((t) => t.status === 'running').length));
+      add({ key: 'reg', label: 'بالتسجيل', sub: 'تستقبل الفرق', icon: 'users', href: '/admin/tournaments', tone: 'info' }, () => tours.then((r) => r.filter((t) => t.status === 'registration').length));
+      add({ key: 'fees', label: 'رسوم بانتظار القرار', sub: 'مبلغ مكتوب وغير مفعّل', icon: 'coins', href: '/admin/fees', tone: 'gold' }, () => tours.then((r) => r.filter((t) => (t.status === 'registration' || t.status === 'running') && !t.feesEnabled && t.entryFeeIqd > 0).length));
     }
-    if (s.can('tournaments.manage')) add({ key: 'ver', label: 'طلبات توثيق', href: '/admin/verifications', tone: 'gold' }, () => count('/admin/verifications?status=pending'));
-    if (s.canSome('results.enter')) add({ key: 'ref', label: 'مباريات تنتظر نتيجتي', href: '/admin/matches' }, () => api<{ refereeing: unknown[] }>('/me/matches').then((r) => r.refereeing.length));
-    if (s.canSome('disputes.decide')) add({ key: 'disp', label: 'اعتراضات مفتوحة', href: '/admin/disputes', tone: 'danger' }, () => count('/admin/disputes?status=open'));
-    if (s.canSome('content.publish') || s.canSome('content.draft') || s.canSome('slides.sponsor')) add({ key: 'slides', label: 'شرائح قيد المراجعة', href: '/admin/slides', tone: 'info' }, () => count('/admin/slides?status=review'));
-    if (s.canSome('content.publish') || s.canSome('content.draft')) add({ key: 'posts', label: 'أخبار قيد المراجعة', href: '/admin/posts', tone: 'info' }, () => count('/admin/posts?status=review'));
-    if (s.canSome('sponsors.manage')) add({ key: 'leads', label: 'طلبات رعاية جديدة', href: '/admin/sponsors', tone: 'gold' }, () => count('/admin/sponsor-leads?status=new'));
+    if (s.can('tournaments.manage')) add({ key: 'ver', label: 'طلبات توثيق', sub: 'فرق تنتظر', icon: 'shield', href: '/admin/verifications', tone: 'gold' }, () => count('/admin/verifications?status=pending'));
+    if (s.canSome('results.enter')) add({ key: 'ref', label: 'مباريات تنتظر نتيجتي', sub: 'بصفتك حكماً', icon: 'whistle', href: '/admin/matches' }, () => api<{ refereeing: unknown[] }>('/me/matches').then((r) => r.refereeing.length));
+    if (s.canSome('disputes.decide')) add({ key: 'disp', label: 'اعتراضات مفتوحة', sub: 'أمام لجنة الانضباط', icon: 'flag', href: '/admin/disputes', tone: 'danger' }, () => count('/admin/disputes?status=open'));
+    if (s.canSome('content.publish') || s.canSome('content.draft') || s.canSome('slides.sponsor')) add({ key: 'slides', label: 'شرائح للمراجعة', sub: 'الهيرو سلايدر', icon: 'slides', href: '/admin/slides', tone: 'info' }, () => count('/admin/slides?status=review'));
+    if (s.canSome('content.publish') || s.canSome('content.draft')) add({ key: 'posts', label: 'أخبار للمراجعة', sub: 'قبل النشر', icon: 'news', href: '/admin/posts', tone: 'info' }, () => count('/admin/posts?status=review'));
+    if (s.canSome('sponsors.manage')) add({ key: 'leads', label: 'طلبات رعاية جديدة', sub: '«كن راعياً»', icon: 'handshake', href: '/admin/sponsors', tone: 'gold' }, () => count('/admin/sponsor-leads?status=new'));
     setTiles(jobs.map(([t]) => t));
     jobs.forEach(([t, fn]) => {
       fn().then((v) => setTiles((all) => all.map((x) => (x.key === t.key ? { ...x, value: v } : x)))).catch(() => undefined);
     });
+    if (s.canSome('sponsor.reports.view')) {
+      const to = new Intl.DateTimeFormat('en-CA', { timeZone: TIMEZONE }).format(new Date());
+      const from = new Date(Date.parse(`${to}T00:00:00Z`) - 13 * 86400_000).toISOString().slice(0, 10);
+      api<Pulse>(`/admin/analytics/sponsors?from=${from}&to=${to}`).then(setPulse).catch(() => setPulse(null));
+    }
   }, [s.me?.id]);
 
   const sections = NAV.filter((n) => n.href !== '/admin' && n.show(s));
   return (
     <>
-      <PageHead title={`أهلاً ${s.me?.fullName ?? ''}`} text="ما ينتظر قرارك الآن، ثم أقسام اللوحة المتاحة لدورك." />
-      {!s.me?.mfa && s.me?.roles.some((r) => ['super_admin', 'content_editor', 'sponsor_manager'].includes(r.role)) && (
-        <p className="form-error">دخلت برقم الهاتف، فصلاحيات الإدارة والمحتوى والرعاة غير مفعّلة. سجّل الخروج وادخل ببريد الإدارة ورمز التحقق.</p>
-      )}
+      <PageHead title={`${greet}، ${s.me?.fullName.split(' ')[0] ?? ''}`} text="ما ينتظر قرارك الآن، ونبض الرعاة، ثم أقسام اللوحة المتاحة لدورك." />
       {tiles.length > 0 && (
-        <div className="grid g200">
-          {tiles.map((t) => (
-            <a key={t.key} href={t.href} className={`card stat${t.tone ? ` t-${t.tone}` : ''}`}>
-              <span className="num">{t.value ?? '…'}</span>
-              <span className="muted">{t.label}</span>
-            </a>
-          ))}
+        <div className="kpis">
+          {tiles.map((t) => <Kpi key={t.key} icon={t.icon} label={t.label} value={t.value === null ? '…' : String(t.value)} sub={t.sub} tone={t.tone} href={t.href} />)}
         </div>
       )}
+
+      {pulse && (
+        <section className="card an-card">
+          <div className="between">
+            <h2>نبض الرعاة — آخر 14 يوماً</h2>
+            <a href="/admin/analytics" className="btn btn-sm"><AIcon name="chart" size={18} /> التحليلات الكاملة</a>
+          </div>
+          <div className="row pulse-row">
+            <span><span className="muted">الظهور</span> <b className="num">{n0(pulse.totals.impressions)}</b></span>
+            <span><span className="muted">النقرات</span> <b className="num">{n0(pulse.totals.clicks)}</b></span>
+            <span><span className="muted">نسبة النقر</span> <b className="num">{pulse.totals.ctr}%</b></span>
+          </div>
+          {pulse.totals.impressions > 0 ? <AreaChart points={pulse.series.map((p) => ({ x: p.day, y: p.impressions }))} label="مرات الظهور" /> : <p className="muted">لا ظهور لشرائح الرعاة في آخر 14 يوماً.</p>}
+        </section>
+      )}
+
       {s.me?.mfa && s.me.roles.some((r) => r.role === 'super_admin') && <Showcase />}
-      <h2 className="admin-h2">الأقسام</h2>
-      <div className="grid g200">
-        {sections.map((n) => <a key={n.href} href={n.href} className="card section-link"><b>{n.label}</b></a>)}
-      </div>
+
+      {NAV_GROUPS.map((g) => {
+        const list = sections.filter((n) => n.group === g);
+        if (!list.length) return null;
+        return (
+          <section key={g} className="admin-sec">
+            <h2 className="admin-h2">{g}</h2>
+            <div className="quick-grid">
+              {list.map((n) => <a key={n.href} href={n.href} className="card quick"><span className="kpi-ico"><AIcon name={n.icon} /></span><b>{n.label}</b></a>)}
+            </div>
+          </section>
+        );
+      })}
     </>
   );
 }

@@ -3,7 +3,7 @@ import type { AgeCategory, ResultStatus, TournamentFormat, TournamentKind, Tourn
 export interface AdminTournament {
   id: number; nameAr: string; slug: string; kind: TournamentKind; format: TournamentFormat; status: TournamentStatus; ageCategory: AgeCategory;
   startsOn: string | null; endsOn: string | null; maxTeams: number | null; drawnAt: string | null; city: string | null;
-  entryFeeIqd: number; disputeWindowHrs: number; groupCount: number | null; qualifiersPerGroup: number | null; doubleRound: boolean;
+  entryFeeIqd: number; feesEnabled: boolean; feesChangedAt: string | null; feesNote: string | null; disputeWindowHrs: number; groupCount: number | null; qualifiersPerGroup: number | null; doubleRound: boolean;
   community: { id: number; nameAr: string } | null;
   _count: { registrations: number; matches: number };
 }

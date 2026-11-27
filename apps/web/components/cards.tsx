@@ -26,9 +26,9 @@ export function LiveCard({ m, label }: { m: MatchItem; label: string }) {
     <article className="card live">
       <div className="between"><span className="muted">{label} · {m.tournament?.nameAr}</span><span className={`badge s-${m.resultStatus}`}>{status}</span></div>
       <div className="vs">
-        <div className="team"><span className="crest lg">{initial(m.homeTeam.nameAr)}</span><b>{m.homeTeam.nameAr}</b></div>
+        <div className="team"><Crest team={m.homeTeam} size="lg" /><b>{m.homeTeam.nameAr}</b></div>
         <span className="num score-lg">{scoreText(m)}</span>
-        <div className="team"><span className="crest lg">{initial(m.awayTeam.nameAr)}</span><b>{m.awayTeam.nameAr}</b></div>
+        <div className="team"><Crest team={m.awayTeam} size="lg" /><b>{m.awayTeam.nameAr}</b></div>
       </div>
       <div className="meta">{m.venue && <span>{m.venue}</span>}<span className="num">{kickoffTime(m.kickoffAt)}</span></div>
       <a href={`/matches/${m.id}`} className="more">تفاصيل المباراة</a>
@@ -53,7 +53,7 @@ export function TourCard({ t }: { t: TournamentSummary }) {
 }
 
 /** شعار الفريق: صورته إن رفعها منشئ الفريق، وإلا الحرف الأول (.crest) */
-export function Crest({ team, size }: { team: TeamRef; size?: 'sm' | 'lg' }) {
+export function Crest({ team, size }: { team: TeamRef; size?: 'sm' | 'lg' | 'xl' }) {
   const cls = `crest${size ? ` ${size}` : ''}`;
   return team.logoUrl
     ? <span className={`${cls} has-img`}><img src={team.logoUrl} alt={`شعار ${team.nameAr}`} loading="lazy" /></span>

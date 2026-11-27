@@ -296,7 +296,7 @@ export class ShowcaseService {
     for (const s of T2) t2Teams.push(await team(s, c2.id));
     const t2 = await tournament({
       nameAr: 'دوري مجموعة شباب الناصرية', slug: 'demo-nasiriyah-league', kind: 'facebook_group', communityId: c2.id, communityKind: 'facebook_group',
-      city: 'الناصرية', startsOn: at(-75), endsOn: at(-55), format: 'league', status: 'finished', maxTeams: 4, entryFeeIqd: 25_000,
+      city: 'الناصرية', startsOn: at(-75), endsOn: at(-55), format: 'league', status: 'finished', maxTeams: 4, entryFeeIqd: 25_000, feesEnabled: true,
       drawSeed: 'showcase-2', drawnAt: at(-76),
     }, t2Teams);
     {
@@ -327,7 +327,7 @@ export class ShowcaseService {
     for (const s of T3) t3Teams.push(await team(s, null));
     const t3 = await tournament({
       nameAr: 'بطولة ساحات البصرة الكبرى', slug: 'demo-basra-groups', kind: 'popular_teams', city: 'البصرة',
-      startsOn: at(-20), endsOn: at(5), format: 'groups_knockout', groupCount: 2, qualifiersPerGroup: 2, status: 'running', maxTeams: 8, entryFeeIqd: 50_000,
+      startsOn: at(-20), endsOn: at(5), format: 'groups_knockout', groupCount: 2, qualifiersPerGroup: 2, status: 'running', maxTeams: 8, entryFeeIqd: 50_000, feesEnabled: true,
       drawSeed: 'showcase-3', drawnAt: at(-21),
     }, t3Teams);
     let liveMatchId = 0;
@@ -403,7 +403,7 @@ export class ShowcaseService {
     for (const s of T5) t5Teams.push(await team(s, c4.id));
     const t5 = await tournament({
       nameAr: 'بطولة أعضاء مجموعة كرة البصرة', slug: 'demo-basra-group-cup', kind: 'facebook_group', communityId: c4.id, communityKind: 'facebook_group',
-      city: 'البصرة', startsOn: at(10), endsOn: at(30), format: 'knockout', status: 'registration', maxTeams: 16, entryFeeIqd: 30_000,
+      city: 'البصرة', startsOn: at(10), endsOn: at(30), format: 'knockout', status: 'registration', maxTeams: 16, entryFeeIqd: 30_000, feesEnabled: true,
     }, t5Teams, (i) => (i < 3 ? 'approved' : 'pending'));
     await prizes(t5.id, [
       { category: 'team_place', rank: 1, amountIqd: 2_500_000, extraAr: 'كأس المجموعة' },

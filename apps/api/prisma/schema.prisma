@@ -303,6 +303,11 @@ model Tournament {
   ageCategory      AgeCategory      @default(open) @map("age_category")
   disputeWindowHrs Int              @default(24) @map("dispute_window_hrs")
   entryFeeIqd      Int              @default(0) @map("entry_fee_iqd")
+  /// رسوم الاشتراك مفعّلة بقرار المدير العام (الجلسة 19) — معطّلة = الاشتراك مجاني ولا تُسجَّل مبالغ
+  feesEnabled      Boolean          @default(false) @map("fees_enabled")
+  feesChangedAt    DateTime?        @map("fees_changed_at") @db.Timestamptz(3)
+  /// سبب آخر تفعيل أو إلغاء (يظهر للفرق)
+  feesNote         String?          @map("fees_note")
   maxTeams         Int?             @map("max_teams")
   /// عدد المجموعات (لنظام المجموعات ثم خروج المغلوب)
   groupCount         Int?           @map("group_count")

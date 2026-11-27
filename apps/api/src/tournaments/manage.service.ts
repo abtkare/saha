@@ -13,6 +13,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { eligibilityProblems } from '../teams/players';
 import { computeStandings } from './standings';
 import { NotificationsService } from '../notifications/notifications';
+import { isSuperAdmin } from '../content/slides';
 import {
   GROUP_LABELS, crossQualifiers, drawGroups, isPowerOfTwo, knockoutStage, knockoutWinner, newSeed, pairUp, roundRobin,
   schedule, shuffle, type Pair,
@@ -92,6 +93,7 @@ export class TournamentManageService {
     const endsOn = date(body, 'endsOn', { optional: true, label: 'تاريخ النهاية' });
     if (startsOn && endsOn && endsOn < startsOn) throw new AppError(400, 'INVALID_DATES', 'تاريخ النهاية قبل تاريخ البداية.');
 
+    const fee0 = int(body, 'entryFeeIqd', { optional: true, min: 0, max: 100_000_000, label: 'رسوم الاشتراك' }) ?? 0;
     try {
       const t = await this.prisma.tournament.create({
         data: {
@@ -100,7 +102,10 @@ export class TournamentManageService {
           city: str(body, 'city', { optional: true, max: 40, label: 'المدينة' }) ?? null,
           startsOn: dbDate(startsOn) ?? null, endsOn: dbDate(endsOn) ?? null,
           maxTeams: int(body, 'maxTeams', { optional: true, min: 2, max: 64, label: 'الحد الأعلى للفرق' }) ?? null,
-          entryFeeIqd: int(body, 'entryFeeIqd', { optional: true, min: 0, max: 100_000_000, label: 'رسوم الاشتراك' }) ?? 0,
+          entryFeeIqd: fee0,
+          // الرسوم تُفعَّل بقرار المدير العام؛ غيره ينشئها معطّلة بانتظار قراره
+          feesEnabled: fee0 > 0 && isSuperAdmin(auth),
+          feesChangedAt: fee0 > 0 && isSuperAdmin(auth) ? new Date() : null,
           disputeWindowHrs: int(body, 'disputeWindowHrs', { optional: true, min: 1, max: 168, label: 'نافذة الاعتراض' }) ?? 24,
           createdById: auth.userId,
         },
@@ -133,7 +138,11 @@ export class TournamentManageService {
     const maxTeams = int(body, 'maxTeams', { optional: true, min: 2, max: 64, label: 'الحد الأعلى للفرق' });
     if (maxTeams !== undefined) data.maxTeams = maxTeams;
     const fee = int(body, 'entryFeeIqd', { optional: true, min: 0, max: 100_000_000, label: 'رسوم الاشتراك' });
-    if (fee !== undefined) data.entryFeeIqd = fee;
+    if (fee !== undefined && fee !== t.entryFeeIqd) {
+      if (t.feesEnabled && !isSuperAdmin(auth)) throw new AppError(403, 'FEES_ADMIN_ONLY', 'الرسوم مفعّلة: تغيير مبلغها من المدير العام فقط (قسم «رسوم الاشتراك»).');
+      data.entryFeeIqd = fee;
+      if (fee === 0 && t.feesEnabled) { data.feesEnabled = false; data.feesChangedAt = new Date(); }
+    }
     const win = int(body, 'disputeWindowHrs', { optional: true, min: 1, max: 168, label: 'نافذة الاعتراض' });
     if (win !== undefined) data.disputeWindowHrs = win;
 
@@ -183,7 +192,7 @@ export class TournamentManageService {
       orderBy: [{ createdAt: 'desc' }],
       select: {
         id: true, nameAr: true, slug: true, kind: true, format: true, status: true, ageCategory: true, startsOn: true, maxTeams: true, drawnAt: true,
-        city: true, endsOn: true, entryFeeIqd: true, disputeWindowHrs: true, groupCount: true, qualifiersPerGroup: true, doubleRound: true,
+        city: true, endsOn: true, entryFeeIqd: true, feesEnabled: true, feesChangedAt: true, feesNote: true, disputeWindowHrs: true, groupCount: true, qualifiersPerGroup: true, doubleRound: true,
         community: { select: { id: true, nameAr: true } },
         _count: { select: { registrations: { where: { status: { in: ['pending', 'approved'] } } }, matches: true } },
       },
@@ -280,13 +289,84 @@ export class TournamentManageService {
     return updated;
   }
 
-  /** تسجيل رسوم الاشتراك يدوياً (لا دفع إلكتروني في المرحلة الأولى) */
+  /** تسجيل رسوم الاشتراك يدوياً (لا دفع إلكتروني في المرحلة الأولى) — فقط والرسوم مفعّلة */
   async recordFee(id: number, regId: number, body: B, { auth, ip }: Ctx) {
     if (!hasPermission(auth.grants, 'sponsors.manage', { tournamentId: id }, auth.mfa)) assertCan(auth, 'tournaments.manage', { tournamentId: id });
     const reg = await this.loadReg(id, regId);
+    const t = await this.prisma.tournament.findUnique({ where: { id }, select: { feesEnabled: true } });
+    if (!t?.feesEnabled) throw new AppError(409, 'FEES_DISABLED', 'رسوم الاشتراك ملغاة لهذه البطولة، فلا تُسجَّل مبالغ.');
     const feePaidIqd = int(body, 'feePaidIqd', { min: 0, max: 100_000_000, label: 'المبلغ المدفوع' })!;
     const updated = await this.prisma.tournamentRegistration.update({ where: { id: regId }, data: { feePaidIqd, feeRecordedBy: auth.userId } });
     await this.audit.record({ actorUserId: auth.userId, action: 'registration.fee', entity: 'tournament_registration', entityId: regId, payload: { tournamentId: id, teamId: reg.teamId, feePaidIqd }, ip });
+    return updated;
+  }
+
+  // ───────────── رسوم الاشتراك (قرار المدير العام) ─────────────
+
+  /** GET /admin/fees — كل البطولات برسومها وحالتها والمحصَّل منها */
+  async feesOverview(auth: AuthContext) {
+    assertActive(auth);
+    const list = await this.prisma.tournament.findMany({
+      where: { status: { not: 'cancelled' } },
+      orderBy: [{ createdAt: 'desc' }],
+      select: {
+        id: true, nameAr: true, slug: true, kind: true, status: true, city: true, entryFeeIqd: true, feesEnabled: true, feesChangedAt: true, feesNote: true,
+        registrations: { where: { status: { in: ['pending', 'approved'] } }, select: { status: true, feePaidIqd: true } },
+      },
+    });
+    const mine = list.filter((t) => hasPermission(auth.grants, 'tournaments.manage', { tournamentId: t.id }, auth.mfa));
+    if (!mine.length && !hasPermission(auth.grants, 'tournaments.manage', {}, auth.mfa)) throw new AppError(403, 'FORBIDDEN', 'لا تملك صلاحية لهذا الإجراء.');
+    return {
+      canDecide: isSuperAdmin(auth),
+      tournaments: mine.map(({ registrations, ...t }) => {
+        const approved = registrations.filter((r) => r.status === 'approved');
+        const paid = approved.filter((r) => (r.feePaidIqd ?? 0) >= t.entryFeeIqd && t.entryFeeIqd > 0).length;
+        return {
+          ...t,
+          teams: approved.length, pending: registrations.length - approved.length, paid,
+          collectedIqd: approved.reduce((n, r) => n + (r.feePaidIqd ?? 0), 0),
+          expectedIqd: t.feesEnabled ? approved.length * t.entryFeeIqd : 0,
+        };
+      }),
+    };
+  }
+
+  /** POST /tournaments/:id/fees {enabled, entryFeeIqd?, note?} — تفعيل الرسوم أو إلغاؤها (المدير العام بدخول TOTP فقط) */
+  async setFees(id: number, body: B, { auth, ip }: Ctx) {
+    assertActive(auth);
+    if (!isSuperAdmin(auth)) throw new AppError(403, 'FEES_ADMIN_ONLY', 'تفعيل الرسوم وإلغاؤها للمدير العام فقط (بدخول البريد ورمز التحقق).');
+    const t = await this.load(id);
+    const enabled = bool(body, 'enabled', 'الحالة');
+    const fee = int(body, 'entryFeeIqd', { optional: true, min: 0, max: 100_000_000, label: 'رسوم الاشتراك' }) ?? t.entryFeeIqd;
+    const note = nullableStr(body, 'note', { max: 300, label: 'السبب' }) ?? null;
+    if (enabled && fee <= 0) throw new AppError(400, 'FEE_REQUIRED', 'اكتب مبلغ الرسوم (أكبر من صفر) قبل تفعيلها.');
+    if (t.status === 'finished' || t.status === 'cancelled') throw new AppError(409, 'TOURNAMENT_CLOSED', 'البطولة منتهية أو ملغاة.');
+    if (enabled === t.feesEnabled && fee === t.entryFeeIqd && note === t.feesNote) return { id, feesEnabled: t.feesEnabled, entryFeeIqd: t.entryFeeIqd, feesNote: t.feesNote };
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.tournament.update({
+        where: { id }, data: { feesEnabled: enabled, entryFeeIqd: fee, feesNote: note, feesChangedAt: new Date() },
+        select: { id: true, feesEnabled: true, entryFeeIqd: true, feesNote: true, feesChangedAt: true },
+      });
+      await this.audit.record({
+        actorUserId: auth.userId, action: enabled ? 'tournament.fees_enable' : 'tournament.fees_disable', entity: 'tournament', entityId: id,
+        payload: { from: { enabled: t.feesEnabled, fee: t.entryFeeIqd }, to: { enabled, fee }, note }, ip,
+      }, tx);
+      return u;
+    });
+
+    // إبلاغ مديري الفرق المسجّلة إن تغيّرت الحالة
+    if (enabled !== t.feesEnabled) {
+      const regs = await this.prisma.tournamentRegistration.findMany({
+        where: { tournamentId: id, status: { in: ['pending', 'approved'] } }, select: { team: { select: { managerId: true } } },
+      });
+      const managers = [...new Set(regs.map((r) => r.team.managerId))];
+      if (managers.length) {
+        await this.notifications.notify(managers, enabled
+          ? { titleAr: 'فُعّلت رسوم الاشتراك', bodyAr: `${t.nameAr}: الرسوم ${fee.toLocaleString('en-US')} دينار.${note ? ` ${note}` : ''}`, data: { type: 'tournament.fees', tournamentId: id } }
+          : { titleAr: 'أُلغيت رسوم الاشتراك', bodyAr: `${t.nameAr}: الاشتراك مجاني الآن.${note ? ` ${note}` : ''}`, data: { type: 'tournament.fees', tournamentId: id } });
+      }
+    }
     return updated;
   }
 

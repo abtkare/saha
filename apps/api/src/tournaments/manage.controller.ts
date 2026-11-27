@@ -63,6 +63,18 @@ export class TournamentManageController {
     return this.svc.recordFee(idParam(id, 'البطولة'), idParam(regId, 'طلب التسجيل'), body, ctx(req));
   }
 
+  /** GET /admin/fees — رسوم الاشتراك لكل بطولة والمحصَّل منها */
+  @Get('admin/fees')
+  fees(@Req() req: AuthedRequest) {
+    return this.svc.feesOverview(req.auth);
+  }
+
+  /** POST /tournaments/:id/fees {enabled, entryFeeIqd?, note?} — قرار المدير العام */
+  @Post('tournaments/:id/fees') @HttpCode(200)
+  setFees(@Param('id') id: string, @Body() body: B, @Req() req: AuthedRequest) {
+    return this.svc.setFees(idParam(id, 'البطولة'), body ?? {}, ctx(req));
+  }
+
   @Post('tournaments/:id/draw') @HttpCode(200)
   draw(@Param('id') id: string, @Req() req: AuthedRequest) {
     return this.svc.draw(idParam(id, 'البطولة'), ctx(req));

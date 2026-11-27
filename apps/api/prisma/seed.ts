@@ -90,7 +90,7 @@ async function seedDemo(adminId: number | null) {
     const popular = await tx.tournament.create({
       data: {
         nameAr: 'بطولة ساحات بغداد الشعبية', slug: 'baghdad-sahat-2026', kind: 'popular_teams', city: 'بغداد',
-        startsOn: at(-10, 12), endsOn: at(20, 12), format: 'league', status: 'running', entryFeeIqd: 50000,
+        startsOn: at(-10, 12), endsOn: at(20, 12), format: 'league', status: 'running', entryFeeIqd: 50000, feesEnabled: true,
         maxTeams: 6, createdById: adminId,
       },
     });

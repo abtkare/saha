@@ -24,7 +24,7 @@ export class TournamentsService {
       orderBy: [{ startsOn: 'desc' }, { id: 'desc' }],
       select: {
         id: true, nameAr: true, slug: true, kind: true, city: true, startsOn: true, endsOn: true,
-        format: true, ageCategory: true, status: true,
+        format: true, ageCategory: true, status: true, feesEnabled: true, entryFeeIqd: true,
         community: { select: { id: true, kind: true, nameAr: true, platformUrl: true } },
         maxTeams: true,
         _count: { select: { registrations: { where: { status: 'approved' } }, matches: true } },
@@ -40,7 +40,7 @@ export class TournamentsService {
       const played = own.filter((m) => m.resultStatus !== 'scheduled');
       const rounds = Math.max(0, ...own.map((m) => m.round ?? 0));
       const currentRound = Math.max(0, ...played.map((m) => m.round ?? 0));
-      return { ...t, progress: { played: played.length, total: own.length, currentRound, rounds } };
+      return { ...t, entryFeeIqd: t.feesEnabled ? t.entryFeeIqd : 0, progress: { played: played.length, total: own.length, currentRound, rounds } };
     });
   }
 
@@ -205,6 +205,7 @@ export class TournamentsService {
       },
     });
     if (!t) throw new AppError(404, 'TOURNAMENT_NOT_FOUND', 'البطولة غير موجودة.');
-    return t;
+    // الرسوم الملغاة لا تظهر للجمهور: الاشتراك مجاني
+    return { ...t, entryFeeIqd: t.feesEnabled ? t.entryFeeIqd : 0 };
   }
 }
