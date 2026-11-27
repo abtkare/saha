@@ -14,7 +14,7 @@ import { Button, Card, Chip, Crest, Empty, ErrorBox, Field, Loading, Notice, Scr
 import { dateTime, isKnockout, kickoffTime, scoreText } from '../format';
 import { errMsg, useLoad } from '../hooks';
 import { useNav } from '../nav';
-import { radius, row, T, useTheme } from '../theme';
+import { radius, row, start, T, useTheme } from '../theme';
 import type { MatchDetail, MyMatch, TeamDetail } from '../types';
 
 const STATUS_HELP: Record<ResultStatus, string> = {
@@ -70,11 +70,12 @@ export function MatchScreen({ id }: { id: number }) {
                   <StatusBadge status={m.resultStatus} label={m.resultStatus === 'scheduled' ? RESULT_STATUS_LABELS.scheduled : `نتيجة ${RESULT_STATUS_LABELS[m.resultStatus]}`} />
                 </View>
                 <View style={{ flexDirection: row, alignItems: 'center' }}>
-                  <TeamBig name={m.homeTeam.nameAr} onPress={() => push({ name: 'team', id: m.homeTeam.id })} ok={m.resultStatus !== 'scheduled' && m.homeConfirmed} />
+                  <TeamBig name={m.homeTeam.nameAr} logo={m.homeTeam.logoUrl} onPress={() => push({ name: 'team', id: m.homeTeam.id })} ok={m.resultStatus !== 'scheduled' && m.homeConfirmed} />
                   <T v="num" size={44} center style={{ flex: 1, lineHeight: 52 }}>{scoreText(m)}</T>
-                  <TeamBig name={m.awayTeam.nameAr} onPress={() => push({ name: 'team', id: m.awayTeam.id })} ok={m.resultStatus !== 'scheduled' && m.awayConfirmed} />
+                  <TeamBig name={m.awayTeam.nameAr} logo={m.awayTeam.logoUrl} onPress={() => push({ name: 'team', id: m.awayTeam.id })} ok={m.resultStatus !== 'scheduled' && m.awayConfirmed} />
                 </View>
                 {m.homePens !== null && m.awayPens !== null && <T v="smallB" center>{`ركلات الترجيح ${m.homePens} – ${m.awayPens}`}</T>}
+                <Scorers m={m} />
                 {m.resultStatus === 'scheduled' && m.liveText ? <Notice tone="ok">{m.liveText}</Notice> : null}
                 <View style={{ flexDirection: row, justifyContent: 'center', gap: 16, borderTopWidth: 1, borderTopColor: c.line, paddingTop: 12, flexWrap: 'wrap' }}>
                   <T v="small" muted>{dateTime(m.kickoffAt) || 'الموعد لاحقاً'}</T>
@@ -100,27 +101,12 @@ export function MatchScreen({ id }: { id: number }) {
               )}
             </Section>
 
-            <Section title="الأحداث">
-              {m.events.length ? (
-                <Card flush>
-                  {[...m.events].sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999)).map((e, i) => {
-                    const home = e.teamId === m.homeTeam.id;
-                    return (
-                      <View key={e.id}>
-                        {i > 0 && <Divider />}
-                        <View style={{ flexDirection: row, alignItems: 'center', gap: 10, padding: 12 }}>
-                          <T v="num" size={14} muted style={{ width: 34 }}>{e.minute !== null ? `${e.minute}'` : '—'}</T>
-                          <T size={18}>{EVENT_ICON[e.type]}</T>
-                          <View style={{ flex: 1 }}>
-                            <T v="bodyB">{`${MATCH_EVENT_LABELS[e.type]}${e.player ? ` — ${e.player.name}` : ''}`}</T>
-                            <T v="small" muted>{home ? m.homeTeam.nameAr : m.awayTeam.nameAr}</T>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </Card>
-              ) : <Empty>لا أحداث مسجّلة.</Empty>}
+            <Section title="إحصائيات">
+              <StatCompare m={m} />
+            </Section>
+
+            <Section title="مجريات المباراة">
+              {m.events.length ? <Timeline m={m} /> : <Empty>لا أحداث مسجّلة.</Empty>}
             </Section>
           </>
         )}
@@ -130,17 +116,113 @@ export function MatchScreen({ id }: { id: number }) {
   );
 }
 
-function TeamBig({ name, onPress, ok }: { name: string; onPress: () => void; ok: boolean }) {
+function TeamBig({ name, logo, onPress, ok }: { name: string; logo?: string | null; onPress: () => void; ok: boolean }) {
   const { c } = useTheme();
   return (
     <Pressable onPress={onPress} accessibilityRole="link" style={{ flex: 1, alignItems: 'center', gap: 8 }}>
       <View>
-        <Crest name={name} size={56} />
+        <Crest name={name} uri={logo} size={64} />
         {ok && <View style={{ position: 'absolute', bottom: -2, left: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: c.primary, alignItems: 'center', justifyContent: 'center' }}><Icon name="check" size={12} color="#FFFFFF" width={3} /></View>}
       </View>
       <T v="bodyB" center numberOfLines={2}>{name}</T>
     </Pressable>
   );
+}
+
+type Side = 'home' | 'away';
+const rowRev = row === 'row' ? 'row-reverse' : 'row';
+const endAlign = start === 'flex-start' ? 'flex-end' : 'flex-start';
+const sideOf = (m: MatchDetail, teamId: number): Side => (teamId === m.homeTeam.id ? 'home' : 'away');
+const sortedEvents = (m: MatchDetail) => [...m.events].sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999) || a.id - b.id);
+const scorersOf = (m: MatchDetail, s: Side) => sortedEvents(m).filter((e) => (e.type === 'goal' && sideOf(m, e.teamId) === s) || (e.type === 'own_goal' && sideOf(m, e.teamId) !== s));
+const mins = (v: number | null) => (v !== null ? `${v}'` : '');
+
+/** الهدافون تحت النتيجة: كل فريق في جهته */
+function Scorers({ m }: { m: MatchDetail }) {
+  const h = scorersOf(m, 'home'), a = scorersOf(m, 'away');
+  if (!h.length && !a.length) return null;
+  const col = (list: typeof h) => (
+    <View style={{ flex: 1, gap: 2 }}>
+      {list.map((e) => <T key={e.id} v="small" muted center numberOfLines={1}>{`${e.player?.name ?? 'هدف'}${e.type === 'own_goal' ? ' (عكسي)' : ''} ${mins(e.minute)}`}</T>)}
+    </View>
+  );
+  return <View style={{ flexDirection: row, gap: 12 }}>{col(h)}<View style={{ width: 20, alignItems: 'center' }}><T size={14}>⚽</T></View>{col(a)}</View>;
+}
+
+/** مقارنة إحصائية بأشرطة: الأهداف والبطاقات، وأفضل لاعب */
+function StatCompare({ m }: { m: MatchDetail }) {
+  const { c } = useTheme();
+  const count = (s: Side, t: MatchEventType) => m.events.filter((e) => e.type === t && sideOf(m, e.teamId) === s).length;
+  const rows: [string, number, number][] = [
+    ['الأهداف', m.homeScore ?? scorersOf(m, 'home').length, m.awayScore ?? scorersOf(m, 'away').length],
+    ['البطاقات الصفراء', count('home', 'yellow_card'), count('away', 'yellow_card')],
+    ['البطاقات الحمراء', count('home', 'red_card'), count('away', 'red_card')],
+  ];
+  const mvp = m.events.find((e) => e.type === 'mvp');
+  return (
+    <Card style={{ padding: 16, gap: 14 }}>
+      <View style={{ flexDirection: row, justifyContent: 'space-between', alignItems: 'center' }}>
+        <View style={{ flexDirection: row, alignItems: 'center', gap: 8, flex: 1 }}><Crest name={m.homeTeam.nameAr} uri={m.homeTeam.logoUrl} size={28} /><T v="smallB" numberOfLines={1} style={{ flexShrink: 1 }}>{m.homeTeam.nameAr}</T></View>
+        <View style={{ flexDirection: row, alignItems: 'center', gap: 8, flex: 1, justifyContent: endAlign }}><T v="smallB" numberOfLines={1} style={{ flexShrink: 1 }}>{m.awayTeam.nameAr}</T><Crest name={m.awayTeam.nameAr} uri={m.awayTeam.logoUrl} size={28} /></View>
+      </View>
+      {rows.map(([label, h, a]) => {
+        const total = h + a || 1;
+        return (
+          <View key={label} style={{ gap: 6 }} accessible accessibilityLabel={`${label}: ${m.homeTeam.nameAr} ${h}، ${m.awayTeam.nameAr} ${a}`}>
+            <View style={{ flexDirection: row, justifyContent: 'space-between', alignItems: 'center' }}>
+              <T v="num" size={18}>{String(h)}</T><T v="small" muted>{label}</T><T v="num" size={18}>{String(a)}</T>
+            </View>
+            <View style={{ flexDirection: row, gap: 4, height: 8 }}>
+              <View style={{ width: `${(h / total) * 100}%` as const, minWidth: 4, borderRadius: 4, backgroundColor: c.primary }} />
+              <View style={{ flex: 1 }} />
+              <View style={{ width: `${(a / total) * 100}%` as const, minWidth: 4, borderRadius: 4, backgroundColor: '#F2B705' }} />
+            </View>
+          </View>
+        );
+      })}
+      {mvp && <><Divider /><T v="small">{`★ أفضل لاعب: ${mvp.player?.name ?? '—'} · ${sideOf(m, mvp.teamId) === 'home' ? m.homeTeam.nameAr : m.awayTeam.nameAr}`}</T></>}
+    </Card>
+  );
+}
+
+/** خط زمني بجهتين: أحداث المضيف يميناً والضيف يساراً، والدقيقة في المنتصف */
+function Timeline({ m }: { m: MatchDetail }) {
+  const { c } = useTheme();
+  return (
+    <Card style={{ paddingVertical: 8 }}>
+      <View style={{ position: 'absolute', top: 12, bottom: 12, left: '50%', width: 2, marginLeft: -1, backgroundColor: c.line }} />
+      {sortedEvents(m).map((e) => {
+        const s = sideOf(m, e.teamId);
+        const ev = (
+          <View style={{ flexDirection: s === 'home' ? row : rowRev, alignItems: 'center', gap: 8, backgroundColor: c.bg, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7, maxWidth: '100%' }}>
+            <EventMark type={e.type} />
+            <View style={{ flexShrink: 1 }}>
+              <T v="smallB" numberOfLines={1}>{e.player?.name ?? MATCH_EVENT_LABELS[e.type]}</T>
+              <T v="tiny" muted>{MATCH_EVENT_LABELS[e.type]}</T>
+            </View>
+          </View>
+        );
+        return (
+          <View key={e.id} style={{ flexDirection: row, alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5 }}
+            accessible accessibilityLabel={`${mins(e.minute)} ${MATCH_EVENT_LABELS[e.type]}${e.player ? ` — ${e.player.name}` : ''} · ${s === 'home' ? m.homeTeam.nameAr : m.awayTeam.nameAr}`}>
+            <View style={{ flex: 1, alignItems: start }}>{s === 'home' ? ev : null}</View>
+            <View style={{ width: 48, height: 28, borderRadius: 14, borderWidth: 2, borderColor: c.primary, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center', marginHorizontal: 6 }}>
+              <T v="num" size={12} color={c.primary}>{mins(e.minute) || '—'}</T>
+            </View>
+            <View style={{ flex: 1, alignItems: endAlign }}>{s === 'away' ? ev : null}</View>
+          </View>
+        );
+      })}
+    </Card>
+  );
+}
+
+/** رمز الحدث: بطاقة ملوّنة مرسومة، أو رمز */
+function EventMark({ type }: { type: MatchEventType }) {
+  if (type === 'yellow_card' || type === 'red_card') {
+    return <View style={{ width: 12, height: 16, borderRadius: 2, backgroundColor: type === 'red_card' ? '#D7263D' : '#F2C200' }} />;
+  }
+  return <T size={16}>{EVENT_ICON[type]}</T>;
 }
 
 /** ورقة الاعتراض: السبب (10 أحرف على الأقل) */

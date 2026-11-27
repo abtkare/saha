@@ -196,12 +196,36 @@ describe('الجلسة 3 — بطولة دوري بـ 8 فرق من البداي
     expect((await dec(managers[8].teamId)).body.code).toBe('TOURNAMENT_FULL');
     expect((await dec(managers[8].teamId, false)).body.status).toBe('rejected');
 
+    // الجلسة 19: الرسوم معطّلة افتراضياً، وتفعيلها وإلغاؤها للمدير العام وحده
+    expect((await api('PATCH', `/tournaments/${leagueId}/registrations/${regs[m1.teamId]}/fee`, { feePaidIqd: 50000 }, tm.token)).body.code).toBe('FEES_DISABLED');
+    expect((await api('POST', `/tournaments/${leagueId}/fees`, { enabled: true, entryFeeIqd: 50000 }, tm.token)).body.code).toBe('FEES_ADMIN_ONLY');
+    expect((await api('POST', `/tournaments/${leagueId}/fees`, { enabled: true }, admin)).body.code).toBe('FEE_REQUIRED');
+    const on = await api('POST', `/tournaments/${leagueId}/fees`, { enabled: true, entryFeeIqd: 50000, note: 'تشمل الكرات والحكام' }, admin);
+    expect(on.status, JSON.stringify(on.body)).toBe(200);
+    expect(on.body).toMatchObject({ feesEnabled: true, entryFeeIqd: 50000 });
+    expect((await api('GET', `/tournaments/${leagueId}`)).body.entryFeeIqd).toBe(50000);
+    // مدير البطولة لا يغيّر مبلغ رسوم مفعّلة
+    expect((await api('PATCH', `/tournaments/${leagueId}`, { entryFeeIqd: 1000 }, tm.token)).body.code).toBe('FEES_ADMIN_ONLY');
+
     // رسوم الاشتراك تُسجَّل يدوياً
     expect((await api('PATCH', `/tournaments/${leagueId}/registrations/${regs[m1.teamId]}/fee`, { feePaidIqd: 50000 }, tm.token)).body.feePaidIqd).toBe(50000);
     expect((await api('PATCH', `/tournaments/${leagueId}/registrations/${regs[m1.teamId]}/fee`, { feePaidIqd: 1 }, m1.token)).status).toBe(403);
 
     const list = await api('GET', `/tournaments/${leagueId}/registrations`, undefined, tm.token);
     expect(list.body.filter((r: any) => r.status === 'approved')).toHaveLength(8);
+
+    // لوحة الرسوم: المحصَّل والمتوقع، ثم الإلغاء يجعل الاشتراك مجانياً للجمهور
+    const fees = await api('GET', '/admin/fees', undefined, admin);
+    const row = fees.body.tournaments.find((t: any) => t.id === leagueId);
+    expect(fees.body.canDecide).toBe(true);
+    expect(row).toMatchObject({ feesEnabled: true, teams: 8, paid: 1, collectedIqd: 50000, expectedIqd: 400000 });
+    expect((await api('GET', '/admin/fees', undefined, tm.token)).body.canDecide).toBe(false);
+    const off = await api('POST', `/tournaments/${leagueId}/fees`, { enabled: false, note: 'برعاية الراعي' }, admin);
+    expect(off.body.feesEnabled).toBe(false);
+    expect((await api('GET', `/tournaments/${leagueId}`)).body.entryFeeIqd).toBe(0);
+    expect((await api('PATCH', `/tournaments/${leagueId}/registrations/${regs[m1.teamId]}/fee`, { feePaidIqd: 1 }, tm.token)).body.code).toBe('FEES_DISABLED');
+    const audit = await db.query(`SELECT action FROM audit_log WHERE entity = 'tournament' AND entity_id = $1 AND action LIKE 'tournament.fees_%' ORDER BY id`, [leagueId]);
+    expect(audit.rows.map((r: any) => r.action)).toEqual(['tournament.fees_enable', 'tournament.fees_disable']);
   });
 
   it('القرعة: 28 مباراة في 7 جولات، ويمكن لأي أحد إعادة حسابها من البذرة', async () => {

@@ -19,6 +19,7 @@ interface TournamentDetail {
   id: number; nameAr: string; slug: string; kind: TournamentKind; status: TournamentStatus; city: string | null;
   format: TournamentFormat; ageCategory: AgeCategory; startsOn: string | null; endsOn: string | null;
   community: { nameAr: string } | null;
+  entryFeeIqd?: number; feesNote?: string | null;
   registrations: { team: TeamRef & { verifiedAt: string | null } }[];
   matches: MatchItem[];
 }
@@ -61,6 +62,7 @@ export default async function TournamentPage({ params }: Props) {
               <span>{TOURNAMENT_FORMAT_LABELS[t.format]}</span>
               <span>الفئة: {AGE_CATEGORY_LABELS[t.ageCategory]}</span>
               <span>{t.registrations.length} فرق</span>
+              {(t.status === 'registration' || t.status === 'running') && <span>{t.entryFeeIqd ? `رسوم الاشتراك ${t.entryFeeIqd.toLocaleString('en-US')} دينار` : 'الاشتراك مجاني'}</span>}
             </div>
             {t.status === 'registration' && <div className="row"><a href="/app" className="btn btn-gold">سجّل فريقك</a></div>}
           </div>

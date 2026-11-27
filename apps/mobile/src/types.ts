@@ -40,6 +40,8 @@ export interface TournamentDetail {
   id: number; nameAr: string; slug: string; kind: TournamentKind; status: TournamentStatus; city: string | null;
   format: TournamentFormat; ageCategory: AgeCategory; startsOn: string | null; endsOn: string | null;
   community: { nameAr: string } | null;
+  /** رسوم الاشتراك الفعلية: 0 = مجاني (الرسوم معطّلة أو بلا مبلغ) */
+  entryFeeIqd?: number; feesNote?: string | null;
   registrations: { groupLabel?: string | null; team: TeamRef & { verifiedAt: string | null } }[];
   matches: MatchItem[];
 }

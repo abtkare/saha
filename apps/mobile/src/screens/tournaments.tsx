@@ -110,6 +110,9 @@ export function TournamentScreen({ slug }: { slug: string }) {
                 <Chip tone="glass">{TOURNAMENT_FORMAT_LABELS[t.format]}</Chip>
                 <Chip tone="glass">{`الفئة: ${AGE_CATEGORY_LABELS[t.ageCategory]}`}</Chip>
                 <Chip tone="glass">{`${t.registrations.length} فرق`}</Chip>
+                {(t.status === 'registration' || t.status === 'running') && (
+                  <Chip tone={t.entryFeeIqd ? 'gold' : 'glass'}>{t.entryFeeIqd ? `رسوم الاشتراك ${t.entryFeeIqd.toLocaleString('en-US')} دينار` : 'الاشتراك مجاني'}</Chip>
+                )}
               </View>
               {canRegister && <Button title="سجّل فريقك" kind="gold" icon="plus" onPress={register} />}
               {t.status === 'registration' && !me && <Button title="سجّل فريقك" kind="gold" icon="plus" onPress={() => push({ name: 'login' })} />}

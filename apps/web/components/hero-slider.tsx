@@ -3,8 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RESULT_STATUS_LABELS } from '@saha/shared';
 import type { Hero, HeroSlide, MatchItem } from '@/lib/api';
 import { deviceId } from '@/lib/client';
-import { initial, kickoffTime, scoreText } from '@/lib/format';
-import { LiveCard } from './cards';
+import { kickoffTime, scoreText } from '@/lib/format';
+import { Crest, LiveCard } from './cards';
 
 const AUTO_MS = 6000;
 
@@ -26,9 +26,9 @@ function MatchSlide({ s }: { s: HeroSlide }) {
     <>
       <div className="between"><span className="muted">{s.titleAr} · {m.tournament.nameAr}</span><span className={`badge ${live ? 'b-live' : `s-${m.resultStatus}`}`}>{status}</span></div>
       <div className="vs">
-        <div className="team"><span className="crest lg">{initial(m.homeTeam.nameAr)}</span><b>{m.homeTeam.nameAr}</b></div>
+        <div className="team"><Crest team={m.homeTeam} size="lg" /><b>{m.homeTeam.nameAr}</b></div>
         <span className="num score-lg">{scoreText(m)}</span>
-        <div className="team"><span className="crest lg">{initial(m.awayTeam.nameAr)}</span><b>{m.awayTeam.nameAr}</b></div>
+        <div className="team"><Crest team={m.awayTeam} size="lg" /><b>{m.awayTeam.nameAr}</b></div>
       </div>
       {live && <p className="live-text">{m.liveText}</p>}
       {m.homePens !== null && m.awayPens !== null && <p className="live-text">ركلات الترجيح <span className="num">{m.homePens} – {m.awayPens}</span></p>}

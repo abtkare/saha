@@ -69,6 +69,12 @@ export default function AdminTournament() {
       </PageHead>
       <Note note={act.note} />
 
+      <a href="/admin/fees" className={`card kpi fee-strip${t.feesEnabled ? ' t-gold' : ''}`}>
+        <span className="kpi-top"><span>رسوم الاشتراك</span><span className={`badge ${t.feesEnabled ? 's-provisional' : 's-confirmed'}`}>{t.feesEnabled ? 'مفعّلة' : 'ملغاة — الاشتراك مجاني'}</span></span>
+        <span className="num">{t.feesEnabled ? `${t.entryFeeIqd.toLocaleString('en-US')} دينار` : 'مجاني'}</span>
+        {t.feesNote && <small>{t.feesNote}</small>}
+      </a>
+
       <details className="card panel">
         <summary>بيانات البطولة</summary>
         <form className="grid-form" onSubmit={save}>
@@ -77,7 +83,7 @@ export default function AdminTournament() {
           <Field label="تاريخ البداية"><input name="startsOn" type="date" defaultValue={t.startsOn?.slice(0, 10) ?? ''} /></Field>
           <Field label="تاريخ النهاية"><input name="endsOn" type="date" defaultValue={t.endsOn?.slice(0, 10) ?? ''} /></Field>
           <Field label="الحد الأعلى للفرق"><input name="maxTeams" type="number" min={2} max={64} defaultValue={t.maxTeams ?? ''} /></Field>
-          <Field label="رسوم الاشتراك (دينار)"><input name="entryFeeIqd" type="number" min={0} defaultValue={t.entryFeeIqd} /></Field>
+          <Field label="رسوم الاشتراك (دينار)" hint={t.feesEnabled ? 'مفعّلة — يغيّرها المدير العام من «رسوم الاشتراك».' : 'معطّلة: الاشتراك مجاني حتى يفعّلها المدير العام.'}><input name="entryFeeIqd" type="number" min={0} defaultValue={t.entryFeeIqd} /></Field>
           <Field label="نافذة الاعتراض (ساعات)"><input name="disputeWindowHrs" type="number" min={1} max={168} defaultValue={t.disputeWindowHrs} /></Field>
           <div className="row wide"><button className="btn btn-primary" disabled={act.busy}>حفظ</button></div>
         </form>
@@ -98,7 +104,7 @@ export default function AdminTournament() {
                   <td className="num">{r.team._count.players}</td>
                   <td><span className={`badge ${REG_BADGE[r.status]}`}>{REG_LABELS[r.status]}</span></td>
                   <td>
-                    {r.status === 'approved' || r.status === 'pending' ? (
+                    {!t.feesEnabled ? <span className="muted">{r.feePaidIqd ? <span className="num">{r.feePaidIqd}</span> : 'مجاني'}</span> : r.status === 'approved' || r.status === 'pending' ? (
                       <form className="inline-form" onSubmit={(e) => { e.preventDefault(); const v = num(new FormData(e.currentTarget).get('fee')); void post(`/tournaments/${id}/registrations/${r.id}/fee`, { feePaidIqd: v ?? 0 }, 'سُجّل المبلغ.', 'PATCH'); }}>
                         <input name="fee" type="number" min={0} defaultValue={r.feePaidIqd ?? 0} aria-label="المبلغ المدفوع" />
                         <button className="btn btn-sm">حفظ</button>
